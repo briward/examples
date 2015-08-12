@@ -2395,7 +2395,7 @@ exports.$compile = function (el, host) {
 }
 
 }).call(this,require('_process'))
-},{"../compiler":20,"../util":71,"_process":76}],16:[function(require,module,exports){
+},{"../compiler":20,"../util":71,"_process":80}],16:[function(require,module,exports){
 (function (process){
 var _ = require('./util')
 var config = require('./config')
@@ -2497,7 +2497,7 @@ exports.push = function (watcher) {
 }
 
 }).call(this,require('_process'))
-},{"./config":22,"./util":71,"_process":76}],17:[function(require,module,exports){
+},{"./config":22,"./util":71,"_process":80}],17:[function(require,module,exports){
 /**
  * A doubly linked list-based Least Recently Used (LRU)
  * cache. Will keep most recently used items while
@@ -2798,7 +2798,7 @@ function getDefault (options) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../directives/prop":38,"../parsers/path":61,"../parsers/text":63,"../util":71,"_process":76}],19:[function(require,module,exports){
+},{"../config":22,"../directives/prop":38,"../parsers/path":61,"../parsers/text":63,"../util":71,"_process":80}],19:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var compileProps = require('./compile-props')
@@ -3428,7 +3428,7 @@ function directiveComparator (a, b) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../directives/component":27,"../parsers/directive":59,"../parsers/template":62,"../parsers/text":63,"../util":71,"./compile-props":18,"_process":76}],20:[function(require,module,exports){
+},{"../config":22,"../directives/component":27,"../parsers/directive":59,"../parsers/template":62,"../parsers/text":63,"../util":71,"./compile-props":18,"_process":80}],20:[function(require,module,exports){
 var _ = require('../util')
 
 _.extend(exports, require('./compile'))
@@ -3582,7 +3582,7 @@ function mergeAttrs (from, to) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../parsers/template":62,"../util":71,"_process":76}],22:[function(require,module,exports){
+},{"../config":22,"../parsers/template":62,"../util":71,"_process":80}],22:[function(require,module,exports){
 module.exports = {
 
   /**
@@ -4406,7 +4406,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../parsers/template":62,"../util":71,"_process":76}],28:[function(require,module,exports){
+},{"../config":22,"../parsers/template":62,"../util":71,"_process":80}],28:[function(require,module,exports){
 module.exports = {
 
   isLiteral: true,
@@ -4592,7 +4592,7 @@ function callDetach (child) {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../compiler":20,"../parsers/template":62,"../transition":64,"../util":71,"_process":76}],31:[function(require,module,exports){
+},{"../cache":17,"../compiler":20,"../parsers/template":62,"../transition":64,"../util":71,"_process":80}],31:[function(require,module,exports){
 // manipulation directives
 exports.text = require('./text')
 exports.html = require('./html')
@@ -4724,7 +4724,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../../util":71,"./checkbox":32,"./radio":34,"./select":35,"./text":36,"_process":76}],34:[function(require,module,exports){
+},{"../../util":71,"./checkbox":32,"./radio":34,"./select":35,"./text":36,"_process":80}],34:[function(require,module,exports){
 var _ = require('../../util')
 
 module.exports = {
@@ -4978,7 +4978,7 @@ function indexOf (arr, val) {
 }
 
 }).call(this,require('_process'))
-},{"../../parsers/directive":59,"../../util":71,"../../watcher":75,"_process":76}],36:[function(require,module,exports){
+},{"../../parsers/directive":59,"../../util":71,"../../watcher":75,"_process":80}],36:[function(require,module,exports){
 var _ = require('../../util')
 
 module.exports = {
@@ -5203,7 +5203,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":76}],38:[function(require,module,exports){
+},{"../util":71,"_process":80}],38:[function(require,module,exports){
 // NOTE: the prop internal directive is compiled and linked
 // during _initScope(), before the created hook is called.
 // The purpose is to make the initial prop values available
@@ -5293,7 +5293,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":76}],40:[function(require,module,exports){
+},{"../util":71,"_process":80}],40:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var config = require('../config')
@@ -6051,7 +6051,7 @@ function isPrimitive (value) {
 }
 
 }).call(this,require('_process'))
-},{"../compiler":20,"../config":22,"../parsers/expression":60,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":76}],41:[function(require,module,exports){
+},{"../compiler":20,"../config":22,"../parsers/expression":60,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":80}],41:[function(require,module,exports){
 var transition = require('../transition')
 
 module.exports = function (value) {
@@ -6411,7 +6411,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../compiler":20,"../directives/if":30,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":76}],48:[function(require,module,exports){
+},{"../cache":17,"../compiler":20,"../directives/if":30,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":80}],48:[function(require,module,exports){
 var _ = require('../util')
 var Path = require('../parsers/path')
 
@@ -6982,7 +6982,7 @@ exports._callHook = function (hook) {
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":76}],52:[function(require,module,exports){
+},{"../util":71,"_process":80}],52:[function(require,module,exports){
 var mergeOptions = require('../util').mergeOptions
 
 /**
@@ -7170,7 +7170,7 @@ exports._resolveComponent = function (id, cb) {
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":76}],54:[function(require,module,exports){
+},{"../util":71,"_process":80}],54:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var compiler = require('../compiler')
@@ -7456,7 +7456,7 @@ exports._defineMeta = function (key, value) {
 }
 
 }).call(this,require('_process'))
-},{"../compiler":20,"../observer":57,"../observer/dep":56,"../util":71,"../watcher":75,"_process":76}],55:[function(require,module,exports){
+},{"../compiler":20,"../observer":57,"../observer/dep":56,"../util":71,"../watcher":75,"_process":80}],55:[function(require,module,exports){
 var _ = require('../util')
 var arrayProto = Array.prototype
 var arrayMethods = Object.create(arrayProto)
@@ -8360,7 +8360,7 @@ exports.isSimplePath = function (exp) {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../util":71,"./path":61,"_process":76}],61:[function(require,module,exports){
+},{"../cache":17,"../util":71,"./path":61,"_process":80}],61:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var Cache = require('../cache')
@@ -8712,7 +8712,7 @@ function warnNonExistent (path) {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../util":71,"_process":76}],62:[function(require,module,exports){
+},{"../cache":17,"../util":71,"_process":80}],62:[function(require,module,exports){
 var _ = require('../util')
 var Cache = require('../cache')
 var templateCache = new Cache(1000)
@@ -9797,7 +9797,7 @@ function formatValue (val) {
 }
 
 }).call(this,require('_process'))
-},{"./index":71,"_process":76}],68:[function(require,module,exports){
+},{"./index":71,"_process":80}],68:[function(require,module,exports){
 (function (process){
 /**
  * Enable debug utilities.
@@ -9865,7 +9865,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"_process":76}],69:[function(require,module,exports){
+},{"../config":22,"_process":80}],69:[function(require,module,exports){
 (function (process){
 var _ = require('./index')
 var config = require('../config')
@@ -10141,7 +10141,7 @@ exports.createAnchor = function (content, persist) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"./index":71,"_process":76}],70:[function(require,module,exports){
+},{"../config":22,"./index":71,"_process":80}],70:[function(require,module,exports){
 // can we use __proto__?
 exports.hasProto = '__proto__' in {}
 
@@ -10887,7 +10887,7 @@ exports.resolveAsset = function resolve (options, type, id) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"./index":71,"_process":76}],74:[function(require,module,exports){
+},{"../config":22,"./index":71,"_process":80}],74:[function(require,module,exports){
 var _ = require('./util')
 var extend = _.extend
 
@@ -11274,7 +11274,105 @@ function traverse (obj) {
 module.exports = Watcher
 
 }).call(this,require('_process'))
-},{"./batcher":16,"./config":22,"./observer/dep":56,"./parsers/expression":60,"./util":71,"_process":76}],76:[function(require,module,exports){
+},{"./batcher":16,"./config":22,"./observer/dep":56,"./parsers/expression":60,"./util":71,"_process":80}],76:[function(require,module,exports){
+/**
+ * Boot up the Vue instance and wire up the router.
+ */
+var Vue = require('vue')
+Vue.use(require('vue-resource'))
+var Router = require('director').Router
+var app = new Vue(require('./app.vue'))
+var router = new Router()
+
+/**
+ * Router.
+ */
+router.on('/', function () {
+	app.view = 'home-view'
+})
+
+router.on('/:page', function (url) {
+	app.view = 'page-view'
+	app.params.url = url
+})
+
+router.init('/')
+
+},{"./app.vue":77,"director":1,"vue":74,"vue-resource":3}],77:[function(require,module,exports){
+var __vue_template__ = "<component is=\"{{ view }}\" class=\"view\" params=\"{{ params }}\" v-transition=\"\" transition-mode=\"out-in\">\n    </component>";
+module.exports = {
+    el: '#app',
+    data: {
+      view: '',
+      params: {
+        url: ''
+      }
+    },
+    components: {
+      'home-view': require('./views/home-view.vue'),
+      'page-view': require('./views/page-view.vue')
+    }
+  }
+;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
+
+},{"./views/home-view.vue":78,"./views/page-view.vue":79}],78:[function(require,module,exports){
+var __vue_template__ = "<div id=\"latest\">\n    <div class=\"wrap\">\n      <ul class=\"pure-g\">\n        <li class=\"pure-u-1\">\n          <div class=\"post teaser\" v-repeat=\"articles\">\n            <h2><a class=\"post-link\" href=\"#{{ path }}\" v-html=\"title\"></a></h2>\n          </div>\n        </li>\n      </ul>\n    </div>\n  </div>";
+module.exports = {
+    data: function () {
+      return {
+        articles: {}
+      }
+    },
+    ready: function() {
+      this.fetchArticles()
+    },
+    methods: {
+      fetchArticles: function() {
+        this.$http.get('http://api.briward.site/articles', function (articles) {
+          this.$set('articles', articles)
+        })
+      }
+    }
+  }
+;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
+
+},{}],79:[function(require,module,exports){
+var __vue_template__ = "<div class=\"post full\">\n      <article class=\"post-content\">\n        <div class=\"wrap\">\n          <h1 v-text=\"page.title\"></h1>\n          <div class=\"date\" v-text=\"page.created\"></div>\n        </div>\n        <span v-html=\"page.body\"></span>\n      </article>\n    </div>";
+module.exports = {
+    props: ['params'],
+    data: function () {
+      return {
+        page: {
+          title: '',
+          body: '',
+          created: ''
+        }
+      }
+    },
+    ready: function() {
+      this.fetchPage(this.params.url)
+    },
+    methods: {
+      fetchPage: function(url) {
+        this.$http.get('http://api.briward.site/' + url + '?_format=hal_json', function (page) {
+
+          // Let's convert that ugly timestamp.
+          var date = new Date(page.created[0].value * 1000)
+
+          // Set the page object.
+          this.$set('page', {
+            title: page.title[0].value,
+            body: page.body[0].value,
+            created: date.toDateString()
+          })
+
+        })
+      }
+    }
+  }
+;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
+
+},{}],80:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -11366,102 +11464,4 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],77:[function(require,module,exports){
-/**
- * Boot up the Vue instance and wire up the router.
- */
-var Vue = require('vue')
-Vue.use(require('vue-resource'))
-var Router = require('director').Router
-var app = new Vue(require('./app.vue'))
-var router = new Router()
-
-/**
- * Router.
- */
-router.on('/', function () {
-	app.view = 'home-view'
-})
-
-router.on('/:page', function (url) {
-	app.view = 'page-view'
-	app.params.url = url
-})
-
-router.init('/')
-
-},{"./app.vue":78,"director":1,"vue":74,"vue-resource":3}],78:[function(require,module,exports){
-var __vue_template__ = "<component is=\"{{ view }}\" class=\"view\" params=\"{{ params }}\" keep-alive=\"\" v-transition=\"\" transition-mode=\"out-in\">\n    </component>";
-module.exports = {
-    el: '#app',
-    data: {
-      view: '',
-      params: {
-        url: ''
-      }
-    },
-    components: {
-      'home-view': require('./views/home-view.vue'),
-      'page-view': require('./views/page-view.vue')
-    }
-  }
-;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
-
-},{"./views/home-view.vue":79,"./views/page-view.vue":80}],79:[function(require,module,exports){
-var __vue_template__ = "<div id=\"latest\">\n    <div class=\"wrap\">\n      <ul class=\"pure-g\">\n        <li class=\"pure-u-1\">\n          <div class=\"post teaser\" v-repeat=\"articles\">\n            <h2><a class=\"post-link\" href=\"#{{ path }}\" v-html=\"title\"></a></h2>\n          </div>\n        </li>\n      </ul>\n    </div>\n  </div>";
-module.exports = {
-    data: function () {
-      return {
-        articles: {}
-      }
-    },
-    ready: function() {
-      this.fetchArticles()
-    },
-    methods: {
-      fetchArticles: function() {
-        this.$http.get('http://api.briward.site/articles', function (articles) {
-          this.$set('articles', articles)
-        })
-      }
-    }
-  }
-;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
-
-},{}],80:[function(require,module,exports){
-var __vue_template__ = "<div class=\"post full\">\n      <article class=\"post-content\">\n        <div class=\"wrap\">\n          <h1 v-text=\"page.title\"></h1>\n          <div class=\"date\" v-text=\"page.created\"></div>\n        </div>\n        <span v-html=\"page.body\"></span>\n      </article>\n    </div>";
-module.exports = {
-    props: ['params'],
-    data: function () {
-      return {
-        page: {
-          title: '',
-          body: '',
-          created: ''
-        }
-      }
-    },
-    ready: function() {
-      this.fetchPage(this.params.url)
-    },
-    methods: {
-      fetchPage: function(url) {
-        this.$http.get('http://api.briward.site/' + url + '?_format=hal_json', function (page) {
-
-          // Let's convert that ugly timestamp.
-          var date = new Date(page.created[0].value * 1000)
-
-          // Set the page object.
-          this.$set('page', {
-            title: page.title[0].value,
-            body: page.body[0].value,
-            created: date.toDateString()
-          })
-
-        })
-      }
-    }
-  }
-;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
-
-},{}]},{},[77]);
+},{}]},{},[76]);
