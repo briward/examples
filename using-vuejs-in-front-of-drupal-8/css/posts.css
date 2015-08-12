@@ -1,0 +1,62 @@
+/**
+ *---------------------------------------------------------
+ * Posts
+ *---------------------------------------------------------
+ */
+
+div.post.teaser {
+	border-bottom:1px solid #f2f2f2;
+	padding-bottom:20px;
+	margin-bottom:20px;
+}
+div.post.full p,
+div.post.full h2,
+div.post.full ul {
+	margin:0 auto 1.2rem;
+	width:100%;
+	max-width:75%;
+}
+div.post.full h2 {
+	margin:3rem auto 1.2rem;
+}
+div.post .date {
+	margin-bottom:2rem;
+	border-bottom:1px solid #f2f2f2;
+	padding-bottom:20px;
+}
+div.post pre {
+	max-width:75%;
+	margin:2rem auto;
+	width:100%;
+}
+div.post img {
+	max-width:85%;
+	display:block;
+	margin:2rem auto;
+}
+
+@media screen and (max-width: 35.5em) {
+
+	div.post.full p,
+	div.post.full h2,
+	div.post.full ul {
+		margin:0 auto 1.2rem;
+		width:100%;
+		max-width:85%;
+	}
+
+	div.post pre {
+		max-width:85%;
+		margin:2rem auto;
+		width:100%;
+	}
+
+}
+
+.view {
+	transition: opacity 0.5s ease;
+}
+.view.v-enter,
+.view.v-leave {
+	opacity: 0;
+}

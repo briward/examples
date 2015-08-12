@@ -1,0 +1,79 @@
+@import url('reset.css');
+@import url('grids.css');
+@import url('base.css');
+@import url('home.css');
+@import url('posts.css');
+@import url('menus.css');
+
+/**
+ *---------------------------------------------------------
+ * Main
+ *---------------------------------------------------------
+ */
+
+#main {
+	background:#fff;
+}
+
+/**
+ *---------------------------------------------------------
+ * Header
+ *---------------------------------------------------------
+ */
+
+header {
+	background:#fff;
+	color:rgb(0,0,0,0.2);
+}
+header .inner {
+	padding:30px 0 10px;
+}
+
+/**
+ *---------------------------------------------------------
+ * Wrap
+ *---------------------------------------------------------
+ */
+
+.wrap {
+	max-width:75%;
+	width:100%;
+	margin:0 auto;
+}
+
+@media screen and (max-width: 35.5em) {
+
+	.wrap {
+		max-width:85%;
+		width:100%;
+		margin:0 auto;
+	}
+
+}
+
+/**
+ *---------------------------------------------------------
+ * Content
+ *---------------------------------------------------------
+ */
+
+section#content .inner {
+	padding:30px 0;
+	margin: 0 auto;
+	max-width: 1040px;
+}
+
+/**
+ *---------------------------------------------------------
+ * Footer
+ *---------------------------------------------------------
+ */
+
+footer .inner {
+	padding:40px 0 30px 0;
+	text-align:center;
+}
+footer .inner p {
+	font-weight:300;
+	color:rgba(255, 255, 255, 0.6);
+}

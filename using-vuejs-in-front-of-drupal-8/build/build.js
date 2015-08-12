@@ -1,0 +1,1 @@
+console.error("\n/Users/bri/Code/briward/site/src/views/home-view.vue:19\n  }8\n   ^\nParseError: Unexpected token");

@@ -1,0 +1,28 @@
+/**
+ *---------------------------------------------------------
+ * Menu
+ *---------------------------------------------------------
+ */
+
+nav {
+	margin-bottom:3rem;
+	font-size:1.25rem;
+	text-transform:uppercase;
+}
+nav .inner {
+	margin: 0 auto;
+	max-width: 1040px;
+}
+nav .wrap {
+	max-width:75%;
+}
+nav .wrap ul li {
+	margin:0 25px 0 0;
+}
+nav .wrap ul li a {
+	color:#ccc;
+}
+nav .wrap ul li a:hover {
+	color:#454d57;
+	text-decoration:none;
+}
