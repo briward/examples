@@ -20,9 +20,8 @@ body {
 	font-family: "freight-sans-pro",sans-serif;
 	font-size: 1.4rem;
 	color: #454d57;
-	background:#36363d;
+	background:#13222D;
 	-webkit-font-smoothing: antialiased;
-	height 100%
 }
 
 html, button, input, select, textarea,
@@ -40,7 +39,7 @@ h1 {
 	font-size: 3rem;
 	line-height: 3.2rem;
 	margin: 0 0 2rem;
-	color:#2b95d8;
+	color:#E92E59;
 }
 
 h2 {
@@ -48,7 +47,7 @@ h2 {
 }
 
 a {
-	color:#2b95d8;
+	color:#E92E59;
 	text-decoration:none;
 }
 a:hover {
@@ -70,7 +69,7 @@ div.post.full p:first-of-type:first-letter {
 	font-size:4.2rem;
 	float: left;
 	margin: 0 6px 0 0;
-	color:#2b95d8;
+	color:#E92E59;
 	line-height: 0.6;
 	text-align: center;
 }

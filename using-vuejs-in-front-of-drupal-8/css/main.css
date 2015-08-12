@@ -1,9 +1,9 @@
-@import url('reset.css');
-@import url('grids.css');
-@import url('base.css');
-@import url('home.css');
-@import url('posts.css');
-@import url('menus.css');
+@import url('./reset.css');
+@import url('./grids.css');
+@import url('./base.css');
+@import url('./home.css');
+@import url('./posts.css');
+@import url('./menus.css');
 
 /**
  *---------------------------------------------------------

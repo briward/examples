@@ -11408,7 +11408,7 @@ module.exports = {
 ;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
 
 },{"./views/home-view.vue":79,"./views/page-view.vue":80}],79:[function(require,module,exports){
-var __vue_template__ = "<div id=\"latest\">\n    <div class=\"wrap\">\n      <ul class=\"pure-g\">\n        <li class=\"pure-u-1\">\n          <div class=\"post teaser\" v-repeat=\"articles\">\n            <div class=\"pure-g\">\n              <div class=\"pure-u-1 pure-u-md-1-5\">\n                <p v-text=\"created\"></p>\n              </div>\n              <div class=\"pure-u-1 pure-u-md-4-5\">\n                <h2><a class=\"post-link\" href=\"#{{ path }}\" v-html=\"title\"></a></h2>\n              </div>\n            </div>\n          </div>\n        </li>\n      </ul>\n    </div>\n  </div>";
+var __vue_template__ = "<div id=\"latest\">\n    <div class=\"wrap\">\n      <ul class=\"pure-g\">\n        <li class=\"pure-u-1\">\n          <div class=\"post teaser\" v-repeat=\"articles\">\n            <h2><a class=\"post-link\" href=\"#{{ path }}\" v-html=\"title\"></a></h2>\n          </div>\n        </li>\n      </ul>\n    </div>\n  </div>";
 module.exports = {
     data: function () {
       return {
@@ -11420,7 +11420,7 @@ module.exports = {
     },
     methods: {
       fetchArticles: function() {
-        this.$http.get('http://api.briward.site/rest/export/json/articles', function (articles) {
+        this.$http.get('http://api.briward.site/articles', function (articles) {
           this.$set('articles', articles)
         })
       }
@@ -11446,12 +11446,18 @@ module.exports = {
     },
     methods: {
       fetchPage: function(url) {
-        this.$http.get('http://api.briward.site/' + url + '?_format=json', function (page) {
+        this.$http.get('http://api.briward.site/' + url + '?_format=hal_json', function (page) {
+
+          // Let's convert that ugly timestamp.
+          var date = new Date(page.created[0].value * 1000)
+
+          // Set the page object.
           this.$set('page', {
             title: page.title[0].value,
             body: page.body[0].value,
-            created: page.created[0].value
+            created: date.toDateString()
           })
+
         })
       }
     }
