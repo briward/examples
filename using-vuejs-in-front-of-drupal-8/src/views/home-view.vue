@@ -33,9 +33,8 @@
       fetchArticles: function() {
         this.$http.get('http://api.briward.site/rest/export/json/articles', function (articles) {
           this.$set('articles', articles)
-          console.log(articles)
         })
       }
     }
-  }8
+  }
 </script>
