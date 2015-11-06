@@ -729,56 +729,53 @@ Router.prototype.mount = function(routes, path) {
  * Service for sending network requests.
  */
 
-var _ = require('./lib/util');
 var xhr = require('./lib/xhr');
 var jsonp = require('./lib/jsonp');
 var Promise = require('./lib/promise');
 
-module.exports = function (Vue) {
+module.exports = function (_) {
 
-    var Url = Vue.url;
-    var originUrl = Url.parse(location.href);
+    var originUrl = _.url.parse(location.href);
     var jsonType = {'Content-Type': 'application/json;charset=utf-8'};
 
     function Http(url, options) {
 
         var promise;
 
-        options = options || {};
-
         if (_.isPlainObject(url)) {
             options = url;
             url = '';
         }
 
-        options = _.extend(true, {url: url},
-            Http.options, _.options('http', this, options)
+        options = _.extend({url: url}, options);
+        options = _.extend(true, {},
+            Http.options, this.options, options
         );
 
         if (options.crossOrigin === null) {
             options.crossOrigin = crossOrigin(options.url);
         }
 
-        options.method = options.method.toLowerCase();
+        options.method = options.method.toUpperCase();
         options.headers = _.extend({}, Http.headers.common,
             !options.crossOrigin ? Http.headers.custom : {},
-            Http.headers[options.method],
+            Http.headers[options.method.toLowerCase()],
             options.headers
         );
 
-        if (_.isPlainObject(options.data) && /^(get|jsonp)$/i.test(options.method)) {
+        if (_.isPlainObject(options.data) && /^(GET|JSONP)$/i.test(options.method)) {
             _.extend(options.params, options.data);
             delete options.data;
         }
 
-        if (options.emulateHTTP && !options.crossOrigin && /^(put|patch|delete)$/i.test(options.method)) {
+        if (options.emulateHTTP && !options.crossOrigin && /^(PUT|PATCH|DELETE)$/i.test(options.method)) {
             options.headers['X-HTTP-Method-Override'] = options.method;
-            options.method = 'post';
+            options.method = 'POST';
         }
 
         if (options.emulateJSON && _.isPlainObject(options.data)) {
             options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-            options.data = Url.params(options.data);
+            options.data = _.url.params(options.data);
         }
 
         if (_.isObject(options.data) && /FormData/i.test(options.data.toString())) {
@@ -789,8 +786,8 @@ module.exports = function (Vue) {
             options.data = JSON.stringify(options.data);
         }
 
-        promise = (options.method == 'jsonp' ? jsonp : xhr).call(this, this.$url || Url, options);
-        promise = extendPromise(promise.then(transformResponse, transformResponse), this);
+        promise = (options.method == 'JSONP' ? jsonp : xhr).call(this.vm, _, options);
+        promise = extendPromise(promise.then(transformResponse, transformResponse), this.vm);
 
         if (options.success) {
             promise = promise.success(options.success);
@@ -803,31 +800,31 @@ module.exports = function (Vue) {
         return promise;
     }
 
-    function extendPromise(promise, thisArg) {
+    function extendPromise(promise, vm) {
 
         promise.success = function (fn) {
 
             return extendPromise(promise.then(function (response) {
-                return fn.call(thisArg, response.data, response.status, response) || response;
-            }), thisArg);
+                return fn.call(vm, response.data, response.status, response) || response;
+            }), vm);
 
         };
 
         promise.error = function (fn) {
 
             return extendPromise(promise.then(undefined, function (response) {
-                return fn.call(thisArg, response.data, response.status, response) || response;
-            }), thisArg);
+                return fn.call(vm, response.data, response.status, response) || response;
+            }), vm);
 
         };
 
         promise.always = function (fn) {
 
             var cb = function (response) {
-                return fn.call(thisArg, response.data, response.status, response) || response;
+                return fn.call(vm, response.data, response.status, response) || response;
             };
 
-            return extendPromise(promise.then(cb, cb), thisArg);
+            return extendPromise(promise.then(cb, cb), vm);
         };
 
         return promise;
@@ -846,7 +843,7 @@ module.exports = function (Vue) {
 
     function crossOrigin(url) {
 
-        var requestUrl = Url.parse(url);
+        var requestUrl = _.url.parse(url);
 
         return (requestUrl.protocol !== originUrl.protocol || requestUrl.host !== originUrl.host);
     }
@@ -886,26 +883,43 @@ module.exports = function (Vue) {
         };
     });
 
-    Object.defineProperty(Vue.prototype, '$http', {
-
-        get: function () {
-            return _.extend(Http.bind(this), Http);
-        }
-
-    });
-
-    return Http;
+    return _.http = Http;
 };
 
-},{"./lib/jsonp":4,"./lib/promise":5,"./lib/util":6,"./lib/xhr":7}],3:[function(require,module,exports){
+},{"./lib/jsonp":4,"./lib/promise":5,"./lib/xhr":7}],3:[function(require,module,exports){
 /**
  * Install plugin.
  */
 
 function install(Vue) {
-    Vue.url = require('./url')(Vue);
-    Vue.http = require('./http')(Vue);
-    Vue.resource = require('./resource')(Vue);
+
+    var _ = require('./lib/util')(Vue);
+
+    Vue.url = require('./url')(_);
+    Vue.http = require('./http')(_);
+    Vue.resource = require('./resource')(_);
+
+    Object.defineProperties(Vue.prototype, {
+
+        $url: {
+            get: function () {
+                return this._url || (this._url = _.options(Vue.url, this, this.$options.url));
+            }
+        },
+
+        $http: {
+            get: function () {
+                return this._http || (this._http = _.options(Vue.http, this, this.$options.http));
+            }
+        },
+
+        $resource: {
+            get: function () {
+                return Vue.resource.bind(this);
+            }
+        }
+
+    });
 }
 
 if (window.Vue) {
@@ -913,16 +927,14 @@ if (window.Vue) {
 }
 
 module.exports = install;
-
-},{"./http":2,"./resource":8,"./url":9}],4:[function(require,module,exports){
+},{"./http":2,"./lib/util":6,"./resource":8,"./url":9}],4:[function(require,module,exports){
 /**
  * JSONP request.
  */
 
-var _ = require('./util');
 var Promise = require('./promise');
 
-module.exports = function (url, options) {
+module.exports = function (_, options) {
 
     var callback = '_jsonp' + Math.random().toString(36).substr(2), response = {}, script, body;
 
@@ -935,7 +947,7 @@ module.exports = function (url, options) {
     return new Promise(function (resolve, reject) {
 
         script = document.createElement('script');
-        script.src = url(options.url, options.params);
+        script.src = _.url(options);
         script.type = 'text/javascript';
         script.async = true;
 
@@ -967,7 +979,7 @@ module.exports = function (url, options) {
 
 };
 
-},{"./promise":5,"./util":6}],5:[function(require,module,exports){
+},{"./promise":5}],5:[function(require,module,exports){
 /**
  * Promises/A+ polyfill v1.1.0 (https://github.com/bramstein/promis)
  */
@@ -1184,94 +1196,98 @@ module.exports = window.Promise || Promise;
  * Utility functions.
  */
 
-var _ = exports;
+module.exports = function (Vue) {
 
-_.isArray = Array.isArray;
+    var _ = Vue.util.extend({}, Vue.util);
 
-_.isFunction = function (obj) {
-    return obj && typeof obj === 'function';
-};
+    _.isString = function (value) {
+        return typeof value === 'string';
+    };
 
-_.isObject = function (obj) {
-    return obj !== null && typeof obj === 'object';
-};
+    _.isFunction = function (value) {
+        return typeof value === 'function';
+    };
 
-_.isPlainObject = function (obj) {
-    return Object.prototype.toString.call(obj) === '[object Object]';
-};
+    _.options = function (fn, obj, options) {
 
-_.options = function (key, obj, options) {
+        options = options || {};
 
-    var opts = obj.$options || {};
-
-    return _.extend({},
-        opts[key],
-        options
-    );
-};
-
-_.each = function (obj, iterator) {
-
-    var i, key;
-
-    if (typeof obj.length == 'number') {
-        for (i = 0; i < obj.length; i++) {
-            iterator.call(obj[i], obj[i], i);
+        if (_.isFunction(options)) {
+            options = options.call(obj);
         }
-    } else if (_.isObject(obj)) {
-        for (key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                iterator.call(obj[key], obj[key], key);
+
+        return _.extend(fn.bind({vm: obj, options: options}), fn, {options: options});
+    };
+
+    _.each = function (obj, iterator) {
+
+        var i, key;
+
+        if (typeof obj.length == 'number') {
+            for (i = 0; i < obj.length; i++) {
+                iterator.call(obj[i], obj[i], i);
+            }
+        } else if (_.isObject(obj)) {
+            for (key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    iterator.call(obj[key], obj[key], key);
+                }
+            }
+        }
+
+        return obj;
+    };
+
+    _.extend = function (target) {
+
+        var array = [], args = array.slice.call(arguments, 1), deep;
+
+        if (typeof target == 'boolean') {
+            deep = target;
+            target = args.shift();
+        }
+
+        args.forEach(function (arg) {
+            extend(target, arg, deep);
+        });
+
+        return target;
+    };
+
+    function extend(target, source, deep) {
+        for (var key in source) {
+            if (deep && (_.isPlainObject(source[key]) || _.isArray(source[key]))) {
+                if (_.isPlainObject(source[key]) && !_.isPlainObject(target[key])) {
+                    target[key] = {};
+                }
+                if (_.isArray(source[key]) && !_.isArray(target[key])) {
+                    target[key] = [];
+                }
+                extend(target[key], source[key], deep);
+            } else if (source[key] !== undefined) {
+                target[key] = source[key];
             }
         }
     }
 
-    return obj;
+    return _;
 };
-
-_.extend = function (target) {
-
-    var array = [], args = array.slice.call(arguments, 1), deep;
-
-    if (typeof target == 'boolean') {
-        deep = target;
-        target = args.shift();
-    }
-
-    args.forEach(function (arg) {
-        extend(target, arg, deep);
-    });
-
-    return target;
-};
-
-function extend(target, source, deep) {
-    for (var key in source) {
-        if (deep && (_.isPlainObject(source[key]) || _.isArray(source[key]))) {
-            if (_.isPlainObject(source[key]) && !_.isPlainObject(target[key])) {
-                target[key] = {};
-            }
-            if (_.isArray(source[key]) && !_.isArray(target[key])) {
-                target[key] = [];
-            }
-            extend(target[key], source[key], deep);
-        } else if (source[key] !== undefined) {
-            target[key] = source[key];
-        }
-    }
-}
 
 },{}],7:[function(require,module,exports){
 /**
  * XMLHttp request.
  */
 
-var _ = require('./util');
 var Promise = require('./promise');
+var XDomain = window.XDomainRequest;
 
-module.exports = function (url, options) {
+module.exports = function (_, options) {
 
     var request = new XMLHttpRequest(), promise;
+
+    if (XDomain && options.crossOrigin) {
+        request = new XDomainRequest(); options.headers = {};
+    }
 
     if (_.isPlainObject(options.xhr)) {
         _.extend(request, options.xhr);
@@ -1283,21 +1299,26 @@ module.exports = function (url, options) {
 
     promise = new Promise(function (resolve, reject) {
 
-        request.open(options.method, url(options), true);
+        request.open(options.method, _.url(options), true);
 
         _.each(options.headers, function (value, header) {
             request.setRequestHeader(header, value);
         });
 
-        request.onreadystatechange = function () {
+        var handler = function (event) {
 
-            if (request.readyState === 4) {
+            request.ok = event.type === 'load';
 
+            if (request.ok && request.status) {
                 request.ok = request.status >= 200 && request.status < 300;
-
-                (request.ok ? resolve : reject)(request);
             }
+
+            (request.ok ? resolve : reject)(request);
         };
+
+        request.onload = handler;
+        request.onabort = handler;
+        request.onerror = handler;
 
         request.send(options.data);
     });
@@ -1305,14 +1326,12 @@ module.exports = function (url, options) {
     return promise;
 };
 
-},{"./promise":5,"./util":6}],8:[function(require,module,exports){
+},{"./promise":5}],8:[function(require,module,exports){
 /**
  * Service for interacting with RESTful services.
  */
 
-var _ = require('./lib/util');
-
-module.exports = function (Vue) {
+module.exports = function (_) {
 
     function Resource(url, params, actions) {
 
@@ -1328,7 +1347,7 @@ module.exports = function (Vue) {
             action = _.extend(true, {url: url, params: params || {}}, action);
 
             resource[name] = function () {
-                return (self.$http || Vue.http)(opts(action, arguments));
+                return (self.$http || _.http)(opts(action, arguments));
             };
         });
 
@@ -1349,9 +1368,9 @@ module.exports = function (Vue) {
             case 3:
             case 2:
 
-                if (_.isFunction (args[1])) {
+                if (_.isFunction(args[1])) {
 
-                    if (_.isFunction (args[0])) {
+                    if (_.isFunction(args[0])) {
 
                         success = args[0];
                         error = args[1];
@@ -1373,9 +1392,9 @@ module.exports = function (Vue) {
 
             case 1:
 
-                if (_.isFunction (args[0])) {
+                if (_.isFunction(args[0])) {
                     success = args[0];
-                } else if (/^(post|put|patch)$/i.test(options.method)) {
+                } else if (/^(POST|PUT|PATCH)$/i.test(options.method)) {
                     data = args[0];
                 } else {
                     params = args[0];
@@ -1392,9 +1411,8 @@ module.exports = function (Vue) {
                 throw 'Expected up to 4 arguments [params, data, success, error], got ' + args.length + ' arguments';
         }
 
-        options.url = action.url;
         options.data = data;
-        options.params = _.extend({}, action.params, params);
+        options.params = _.extend({}, options.params, params);
 
         if (success) {
             options.success = success;
@@ -1409,35 +1427,27 @@ module.exports = function (Vue) {
 
     Resource.actions = {
 
-        get: {method: 'get'},
-        save: {method: 'post'},
-        query: {method: 'get'},
-        update: {method: 'put'},
-        remove: {method: 'delete'},
-        delete: {method: 'delete'}
+        get: {method: 'GET'},
+        save: {method: 'POST'},
+        query: {method: 'GET'},
+        update: {method: 'PUT'},
+        remove: {method: 'DELETE'},
+        delete: {method: 'DELETE'}
 
     };
 
-    Object.defineProperty(Vue.prototype, '$resource', {
-
-        get: function () {
-            return Resource.bind(this);
-        }
-
-    });
-
-    return Resource;
+    return _.resource = Resource;
 };
 
-},{"./lib/util":6}],9:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 /**
  * Service for URL templating.
  */
 
-var _ = require('./lib/util');
+var ie = document.documentMode;
 var el = document.createElement('a');
 
-module.exports = function (Vue) {
+module.exports = function (_) {
 
     function Url(url, params) {
 
@@ -1447,24 +1457,23 @@ module.exports = function (Vue) {
             options = {url: url, params: params};
         }
 
-        options = _.extend({}, Url.options, _.options('url', this, options));
+        options = _.extend(true, {},
+            Url.options, this.options, options
+        );
 
-        url = options.url.replace(/:([a-z]\w*)/gi, function (match, name) {
+        url = options.url.replace(/(\/?):([a-z]\w*)/gi, function (match, slash, name) {
 
             if (options.params[name]) {
                 urlParams[name] = true;
-                return encodeUriSegment(options.params[name]);
+                return slash + encodeUriSegment(options.params[name]);
             }
 
             return '';
         });
 
-        if (typeof options.root === 'string' && !url.match(/^(https?:)?\//)) {
+        if (_.isString(options.root) && !url.match(/^(https?:)?\//)) {
             url = options.root + '/' + url;
         }
-
-        url = url.replace(/([^:])[\/]{2,}/g, '$1/');
-        url = url.replace(/(\w+)\/+$/, '$1');
 
         _.each(options.params, function (value, key) {
             if (!urlParams[key]) {
@@ -1487,6 +1496,7 @@ module.exports = function (Vue) {
 
     Url.options = {
         url: '',
+        root: null,
         params: {}
     };
 
@@ -1525,6 +1535,11 @@ module.exports = function (Vue) {
      */
 
     Url.parse = function (url) {
+
+        if (ie) {
+            el.href = url;
+            url = el.href;
+        }
 
         el.href = url;
 
@@ -1580,18 +1595,10 @@ module.exports = function (Vue) {
             replace(/%20/g, (spaces ? '%20' : '+'));
     }
 
-    Object.defineProperty(Vue.prototype, '$url', {
-
-        get: function () {
-            return _.extend(Url.bind(this), Url);
-        }
-
-    });
-
-    return Url;
+    return _.url = Url;
 };
 
-},{"./lib/util":6}],10:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var _ = require('../util')
 
 /**
@@ -1608,13 +1615,15 @@ var _ = require('../util')
 exports.$addChild = function (opts, BaseCtor) {
   BaseCtor = BaseCtor || _.Vue
   opts = opts || {}
-  var parent = this
   var ChildVue
+  var parent = this
+  // transclusion context
+  var context = opts._context || parent
   var inherit = opts.inherit !== undefined
     ? opts.inherit
     : BaseCtor.options.inherit
   if (inherit) {
-    var ctors = parent._childCtors
+    var ctors = context._childCtors
     ChildVue = ctors[BaseCtor.cid]
     if (!ChildVue) {
       var optionName = BaseCtor.options.name
@@ -1628,9 +1637,7 @@ exports.$addChild = function (opts, BaseCtor) {
       )()
       ChildVue.options = BaseCtor.options
       ChildVue.linker = BaseCtor.linker
-      // important: transcluded inline repeaters should
-      // inherit from outer scope rather than host
-      ChildVue.prototype = opts._context || this
+      ChildVue.prototype = context
       ctors[BaseCtor.cid] = ChildVue
     }
   } else {
@@ -1707,7 +1714,7 @@ exports.$delete = function (key) {
  * Watch an expression, trigger callback when its
  * value changes.
  *
- * @param {String} exp
+ * @param {String|Function} expOrFn
  * @param {Function} cb
  * @param {Object} [options]
  *                 - {Boolean} deep
@@ -1716,17 +1723,20 @@ exports.$delete = function (key) {
  * @return {Function} - unwatchFn
  */
 
-exports.$watch = function (exp, cb, options) {
+exports.$watch = function (expOrFn, cb, options) {
   var vm = this
-  var wrappedCb = function (val, oldVal) {
-    cb.call(vm, val, oldVal)
+  var parsed
+  if (typeof expOrFn === 'string') {
+    parsed = dirParser.parse(expOrFn)[0]
+    expOrFn = parsed.expression
   }
-  var watcher = new Watcher(vm, exp, wrappedCb, {
+  var watcher = new Watcher(vm, expOrFn, cb, {
     deep: options && options.deep,
-    user: !options || options.user !== false
+    user: !options || options.user !== false,
+    filters: parsed && parsed.filters
   })
   if (options && options.immediate) {
-    wrappedCb(watcher.value)
+    cb.call(vm, watcher.value)
   }
   return function unwatchFn () {
     watcher.teardown()
@@ -1768,13 +1778,15 @@ exports.$interpolate = function (text) {
   var tokens = textParser.parse(text)
   var vm = this
   if (tokens) {
-    return tokens.length === 1
-      ? vm.$eval(tokens[0].value)
-      : tokens.map(function (token) {
-          return token.tag
-            ? vm.$eval(token.value)
-            : token.value
-        }).join('')
+    if (tokens.length === 1) {
+      return vm.$eval(tokens[0].value) + ''
+    } else {
+      return tokens.map(function (token) {
+        return token.tag
+          ? vm.$eval(token.value)
+          : token.value
+      }).join('')
+    }
   } else {
     return text
   }
@@ -2299,6 +2311,16 @@ exports.use = function (plugin) {
 }
 
 /**
+ * Apply a global mixin by merging it into the default
+ * options.
+ */
+
+exports.mixin = function (mixin) {
+  var Vue = _.Vue
+  Vue.options = _.mergeOptions(Vue.options, mixin)
+}
+
+/**
  * Create asset registration methods with the following
  * signature:
  *
@@ -2391,11 +2413,11 @@ exports.$destroy = function (remove, deferCleanup) {
  */
 
 exports.$compile = function (el, host) {
-  return compiler.compile(el, this.$options, true, host)(this, el)
+  return compiler.compile(el, this.$options, true)(this, el, host)
 }
 
 }).call(this,require('_process'))
-},{"../compiler":20,"../util":71,"_process":80}],16:[function(require,module,exports){
+},{"../compiler":20,"../util":71,"_process":79}],16:[function(require,module,exports){
 (function (process){
 var _ = require('./util')
 var config = require('./config')
@@ -2417,7 +2439,7 @@ var internalQueueDepleted = false
  * Reset the batcher's state.
  */
 
-function reset () {
+function resetBatcherState () {
   queue = []
   userQueue = []
   has = {}
@@ -2429,11 +2451,11 @@ function reset () {
  * Flush both queues and run the watchers.
  */
 
-function flush () {
-  run(queue)
+function flushBatcherQueue () {
+  runBatcherQueue(queue)
   internalQueueDepleted = true
-  run(userQueue)
-  reset()
+  runBatcherQueue(userQueue)
+  resetBatcherState()
 }
 
 /**
@@ -2442,7 +2464,7 @@ function flush () {
  * @param {Array} queue
  */
 
-function run (queue) {
+function runBatcherQueue (queue) {
   // do not cache length because more watchers might be pushed
   // as we run existing watchers
   for (var i = 0; i < queue.length; i++) {
@@ -2491,13 +2513,13 @@ exports.push = function (watcher) {
     // queue the flush
     if (!waiting) {
       waiting = true
-      _.nextTick(flush)
+      _.nextTick(flushBatcherQueue)
     }
   }
 }
 
 }).call(this,require('_process'))
-},{"./config":22,"./util":71,"_process":80}],17:[function(require,module,exports){
+},{"./config":22,"./util":71,"_process":79}],17:[function(require,module,exports){
 /**
  * A doubly linked list-based Least Recently Used (LRU)
  * cache. Will keep most recently used items while
@@ -2798,7 +2820,7 @@ function getDefault (options) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../directives/prop":38,"../parsers/path":61,"../parsers/text":63,"../util":71,"_process":80}],19:[function(require,module,exports){
+},{"../config":22,"../directives/prop":38,"../parsers/path":61,"../parsers/text":63,"../util":71,"_process":79}],19:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var compileProps = require('./compile-props')
@@ -2829,11 +2851,10 @@ var terminalDirectives = [
  * @param {Element|DocumentFragment} el
  * @param {Object} options
  * @param {Boolean} partial
- * @param {Vue} [host] - host vm of transcluded content
  * @return {Function}
  */
 
-exports.compile = function (el, options, partial, host) {
+exports.compile = function (el, options, partial) {
   // link function for the node itself.
   var nodeLinkFn = partial || !options._asComponent
     ? compileNode(el, options)
@@ -2853,10 +2874,11 @@ exports.compile = function (el, options, partial, host) {
    *
    * @param {Vue} vm
    * @param {Element|DocumentFragment} el
+   * @param {Vue} [host] - host vm of transcluded content
    * @return {Function|undefined}
    */
 
-  return function compositeLinkFn (vm, el) {
+  return function compositeLinkFn (vm, el, host) {
     // cache childNodes before linking parent, fix #657
     var childNodes = _.toArray(el.childNodes)
     // link
@@ -3394,22 +3416,26 @@ function collectAttrDirective (name, value, options) {
         allOneTime = false
       }
     }
+    var linker
+    if (allOneTime) {
+      linker = function (vm, el) {
+        el.setAttribute(name, vm.$interpolate(value))
+      }
+    } else {
+      linker = function (vm, el) {
+        var exp = textParser.tokensToExp(tokens, vm)
+        var desc = isClass
+          ? dirParser.parse(exp)[0]
+          : dirParser.parse(name + ':' + exp)[0]
+        if (isClass) {
+          desc._rawClass = value
+        }
+        vm._bindDir(dirName, el, desc, def)
+      }
+    }
     return {
       def: def,
-      _link: allOneTime
-        ? function (vm, el) {
-            el.setAttribute(name, vm.$interpolate(value))
-          }
-        : function (vm, el) {
-            var exp = textParser.tokensToExp(tokens, vm)
-            var desc = isClass
-              ? dirParser.parse(exp)[0]
-              : dirParser.parse(name + ':' + exp)[0]
-            if (isClass) {
-              desc._rawClass = value
-            }
-            vm._bindDir(dirName, el, desc, def)
-          }
+      _link: linker
     }
   }
 }
@@ -3428,7 +3454,7 @@ function directiveComparator (a, b) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../directives/component":27,"../parsers/directive":59,"../parsers/template":62,"../parsers/text":63,"../util":71,"./compile-props":18,"_process":80}],20:[function(require,module,exports){
+},{"../config":22,"../directives/component":27,"../parsers/directive":59,"../parsers/template":62,"../parsers/text":63,"../util":71,"./compile-props":18,"_process":79}],20:[function(require,module,exports){
 var _ = require('../util')
 
 _.extend(exports, require('./compile'))
@@ -3582,7 +3608,7 @@ function mergeAttrs (from, to) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../parsers/template":62,"../util":71,"_process":80}],22:[function(require,module,exports){
+},{"../config":22,"../parsers/template":62,"../util":71,"_process":79}],22:[function(require,module,exports){
 module.exports = {
 
   /**
@@ -3709,11 +3735,13 @@ Object.defineProperty(module.exports, 'delimiters', {
 })
 
 },{}],23:[function(require,module,exports){
+(function (process){
 var _ = require('./util')
 var config = require('./config')
 var Watcher = require('./watcher')
 var textParser = require('./parsers/text')
 var expParser = require('./parsers/expression')
+function noop () {}
 
 /**
  * A directive links a DOM element with a piece of data,
@@ -3748,11 +3776,10 @@ function Directive (name, el, vm, descriptor, def, host) {
   this._host = host
   this._locked = false
   this._bound = false
+  this._listeners = null
   // init
   this._bind(def)
 }
-
-var p = Directive.prototype
 
 /**
  * Initialize the directive, mixin definition properties,
@@ -3762,7 +3789,7 @@ var p = Directive.prototype
  * @param {Object} def
  */
 
-p._bind = function (def) {
+Directive.prototype._bind = function (def) {
   if (
     (this.name !== 'cloak' || this.vm._isCompiled) &&
     this.el && this.el.removeAttribute
@@ -3785,13 +3812,15 @@ p._bind = function (def) {
       !this._checkStatement()) {
     // wrapped updater for context
     var dir = this
-    var update = this._update = this.update
-      ? function (val, oldVal) {
-          if (!dir._locked) {
-            dir.update(val, oldVal)
-          }
+    if (this.update) {
+      this._update = function (val, oldVal) {
+        if (!dir._locked) {
+          dir.update(val, oldVal)
         }
-      : function () {} // noop if no update is provided
+      }
+    } else {
+      this._update = noop
+    }
     // pre-process hook called before the value is piped
     // through the filters. used in v-repeat.
     var preProcess = this._preProcess
@@ -3800,7 +3829,7 @@ p._bind = function (def) {
     var watcher = this._watcher = new Watcher(
       this.vm,
       this._watcherExp,
-      update, // callback
+      this._update, // callback
       {
         filters: this.filters,
         twoWay: this.twoWay,
@@ -3823,7 +3852,7 @@ p._bind = function (def) {
  * e.g. v-component="{{currentView}}"
  */
 
-p._checkDynamicLiteral = function () {
+Directive.prototype._checkDynamicLiteral = function () {
   var expression = this.expression
   if (expression && this.isLiteral) {
     var tokens = textParser.parse(expression)
@@ -3847,7 +3876,7 @@ p._checkDynamicLiteral = function () {
  * @return {Boolean}
  */
 
-p._checkStatement = function () {
+Directive.prototype._checkStatement = function () {
   var expression = this.expression
   if (
     expression && this.acceptStatement &&
@@ -3873,30 +3902,13 @@ p._checkStatement = function () {
  * @return {String}
  */
 
-p._checkParam = function (name) {
+Directive.prototype._checkParam = function (name) {
   var param = this.el.getAttribute(name)
   if (param !== null) {
     this.el.removeAttribute(name)
     param = this.vm.$interpolate(param)
   }
   return param
-}
-
-/**
- * Teardown the watcher and call unbind.
- */
-
-p._teardown = function () {
-  if (this._bound) {
-    this._bound = false
-    if (this.unbind) {
-      this.unbind()
-    }
-    if (this._watcher) {
-      this._watcher.teardown()
-    }
-    this.vm = this.el = this._watcher = null
-  }
 }
 
 /**
@@ -3908,11 +3920,17 @@ p._teardown = function () {
  * @public
  */
 
-p.set = function (value) {
+Directive.prototype.set = function (value) {
+  /* istanbul ignore else */
   if (this.twoWay) {
     this._withLock(function () {
       this._watcher.set(value)
     })
+  } else if (process.env.NODE_ENV !== 'production') {
+    _.warn(
+      'Directive.set() can only be used inside twoWay' +
+      'directives.'
+    )
   }
 }
 
@@ -3923,7 +3941,7 @@ p.set = function (value) {
  * @param {Function} fn
  */
 
-p._withLock = function (fn) {
+Directive.prototype._withLock = function (fn) {
   var self = this
   self._locked = true
   fn.call(self)
@@ -3932,12 +3950,57 @@ p._withLock = function (fn) {
   })
 }
 
+/**
+ * Convenience method that attaches a DOM event listener
+ * to the directive element and autometically tears it down
+ * during unbind.
+ *
+ * @param {String} event
+ * @param {Function} handler
+ */
+
+Directive.prototype.on = function (event, handler) {
+  _.on(this.el, event, handler)
+  ;(this._listeners || (this._listeners = []))
+    .push([event, handler])
+}
+
+/**
+ * Teardown the watcher and call unbind.
+ */
+
+Directive.prototype._teardown = function () {
+  if (this._bound) {
+    this._bound = false
+    if (this.unbind) {
+      this.unbind()
+    }
+    if (this._watcher) {
+      this._watcher.teardown()
+    }
+    var listeners = this._listeners
+    if (listeners) {
+      for (var i = 0; i < listeners.length; i++) {
+        _.off(this.el, listeners[i][0], listeners[i][1])
+      }
+    }
+    this.vm = this.el =
+    this._watcher = this._listeners = null
+  }
+}
+
 module.exports = Directive
 
-},{"./config":22,"./parsers/expression":60,"./parsers/text":63,"./util":71,"./watcher":75}],24:[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./config":22,"./parsers/expression":60,"./parsers/text":63,"./util":71,"./watcher":75,"_process":79}],24:[function(require,module,exports){
 // xlink
 var xlinkNS = 'http://www.w3.org/1999/xlink'
 var xlinkRE = /^xlink:/
+var inputProps = {
+  value: 1,
+  checked: 1,
+  selected: 1
+}
 
 module.exports = {
 
@@ -3972,12 +4035,12 @@ module.exports = {
   },
 
   setAttr: function (attr, value) {
-    if (attr === 'value' && attr in this.el) {
+    if (inputProps[attr] && attr in this.el) {
       if (!this.valueRemoved) {
         this.el.removeAttribute(attr)
         this.valueRemoved = true
       }
-      this.el.value = value
+      this.el[attr] = value
     } else if (value != null && value !== false) {
       if (xlinkRE.test(attr)) {
         this.el.setAttributeNS(xlinkNS, attr, value)
@@ -4202,14 +4265,18 @@ module.exports = {
           options = {
             created: function () {
               this.$once(waitFor, function () {
+                self.waitingFor = null
                 self.transition(this, cb)
               })
             }
           }
         }
+        var cached = this.getCached()
         var newComponent = this.build(options)
-        if (!waitFor) {
+        if (!waitFor || cached) {
           this.transition(newComponent, cb)
+        } else {
+          this.waitingFor = newComponent
         }
       }, this))
     }
@@ -4252,11 +4319,9 @@ module.exports = {
    */
 
   build: function (extraOptions) {
-    if (this.keepAlive) {
-      var cached = this.cache[this.Component.cid]
-      if (cached) {
-        return cached
-      }
+    var cached = this.getCached()
+    if (cached) {
+      return cached
     }
     if (this.Component) {
       // default options
@@ -4284,6 +4349,16 @@ module.exports = {
   },
 
   /**
+   * Try to get a cached instance of the current component.
+   *
+   * @return {Vue|undefined}
+   */
+
+  getCached: function () {
+    return this.keepAlive && this.cache[this.Component.cid]
+  },
+
+  /**
    * Teardown the current child, but defers cleanup so
    * that we can separate the destroy and removal steps.
    *
@@ -4291,6 +4366,10 @@ module.exports = {
    */
 
   unbuild: function (defer) {
+    if (this.waitingFor) {
+      this.waitingFor.$destroy()
+      this.waitingFor = null
+    }
     var child = this.childVM
     if (!child || this.keepAlive) {
       return
@@ -4342,7 +4421,6 @@ module.exports = {
   transition: function (target, cb) {
     var self = this
     var current = this.childVM
-    this.unsetCurrent()
     this.setCurrent(target)
     switch (self.transMode) {
       case 'in-out':
@@ -4366,6 +4444,7 @@ module.exports = {
    */
 
   setCurrent: function (child) {
+    this.unsetCurrent()
     this.childVM = child
     var refID = child._refID || this.refID
     if (refID) {
@@ -4406,7 +4485,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"../parsers/template":62,"../util":71,"_process":80}],28:[function(require,module,exports){
+},{"../config":22,"../parsers/template":62,"../util":71,"_process":79}],28:[function(require,module,exports){
 module.exports = {
 
   isLiteral: true,
@@ -4493,8 +4572,7 @@ module.exports = {
         this.linker = compiler.compile(
           this.template,
           this.vm.$options,
-          true, // partial
-          this._host // important
+          true // partial
         )
         cache.put(cacheId, this.linker)
       }
@@ -4525,7 +4603,7 @@ module.exports = {
 
   link: function (frag, linker) {
     var vm = this.vm
-    this.unlink = linker(vm, frag)
+    this.unlink = linker(vm, frag, this._host /* important */)
     transition.blockAppend(frag, this.end, vm)
     // call attached for all the child components created
     // during the compilation
@@ -4549,7 +4627,7 @@ module.exports = {
   },
 
   getContainedComponents: function () {
-    var vm = this.vm
+    var vm = this._host || this.vm
     var start = this.start.nextSibling
     var end = this.end
 
@@ -4592,7 +4670,7 @@ function callDetach (child) {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../compiler":20,"../parsers/template":62,"../transition":64,"../util":71,"_process":80}],31:[function(require,module,exports){
+},{"../cache":17,"../compiler":20,"../parsers/template":62,"../transition":64,"../util":71,"_process":79}],31:[function(require,module,exports){
 // manipulation directives
 exports.text = require('./text')
 exports.html = require('./html')
@@ -4626,21 +4704,39 @@ module.exports = {
   bind: function () {
     var self = this
     var el = this.el
-    this.listener = function () {
-      self.set(el.checked)
+    var trueExp = this._checkParam('true-exp')
+    var falseExp = this._checkParam('false-exp')
+
+    this._matchValue = function (value) {
+      if (trueExp !== null) {
+        return _.looseEqual(value, self.vm.$eval(trueExp))
+      } else {
+        return !!value
+      }
     }
-    _.on(el, 'change', this.listener)
+
+    function getValue () {
+      var val = el.checked
+      if (val && trueExp !== null) {
+        val = self.vm.$eval(trueExp)
+      }
+      if (!val && falseExp !== null) {
+        val = self.vm.$eval(falseExp)
+      }
+      return val
+    }
+
+    this.on('change', function () {
+      self.set(getValue())
+    })
+
     if (el.checked) {
-      this._initValue = el.checked
+      this._initValue = getValue()
     }
   },
 
   update: function (value) {
-    this.el.checked = !!value
-  },
-
-  unbind: function () {
-    _.off(this.el, 'change', this.listener)
+    this.el.checked = this._matchValue(value)
   }
 }
 
@@ -4698,9 +4794,10 @@ module.exports = {
       )
       return
     }
+    el.__v_model = this
     handler.bind.call(this)
     this.update = handler.update
-    this.unbind = handler.unbind
+    this._unbind = handler.unbind
   },
 
   /**
@@ -4720,11 +4817,16 @@ module.exports = {
         this.hasWrite = true
       }
     }
+  },
+
+  unbind: function () {
+    this.el.__v_model = null
+    this._unbind && this._unbind()
   }
 }
 
 }).call(this,require('_process'))
-},{"../../util":71,"./checkbox":32,"./radio":34,"./select":35,"./text":36,"_process":80}],34:[function(require,module,exports){
+},{"../../util":71,"./checkbox":32,"./radio":34,"./select":35,"./text":36,"_process":79}],34:[function(require,module,exports){
 var _ = require('../../util')
 
 module.exports = {
@@ -4733,28 +4835,29 @@ module.exports = {
     var self = this
     var el = this.el
     var number = this._checkParam('number') != null
-    function getValue () {
-      return number
-        ? _.toNumber(el.value)
-        : el.value
+    var expression = this._checkParam('exp')
+
+    this.getValue = function () {
+      var val = el.value
+      if (number) {
+        val = _.toNumber(val)
+      } else if (expression !== null) {
+        val = self.vm.$eval(expression)
+      }
+      return val
     }
-    this.listener = function () {
-      self.set(getValue())
-    }
-    _.on(el, 'change', this.listener)
+
+    this.on('change', function () {
+      self.set(self.getValue())
+    })
+
     if (el.checked) {
-      this._initValue = getValue()
+      this._initValue = this.getValue()
     }
   },
 
   update: function (value) {
-    /* eslint-disable eqeqeq */
-    this.el.checked = value == this.el.value
-    /* eslint-enable eqeqeq */
-  },
-
-  unbind: function () {
-    _.off(this.el, 'change', this.listener)
+    this.el.checked = _.looseEqual(value, this.getValue())
   }
 }
 
@@ -4769,12 +4872,14 @@ module.exports = {
   bind: function () {
     var self = this
     var el = this.el
-    // update DOM using latest value.
+
+    // method to force update DOM using latest value.
     this.forceUpdate = function () {
       if (self._watcher) {
         self.update(self._watcher.get())
       }
     }
+
     // check options param
     var optionsParam = this._checkParam('options')
     if (optionsParam) {
@@ -4782,19 +4887,21 @@ module.exports = {
     }
     this.number = this._checkParam('number') != null
     this.multiple = el.hasAttribute('multiple')
-    this.listener = function () {
-      var value = self.multiple
-        ? getMultiValue(el)
-        : el.value
+
+    // attach listener
+    this.on('change', function () {
+      var value = getValue(el, self.multiple)
       value = self.number
         ? _.isArray(value)
           ? value.map(_.toNumber)
           : _.toNumber(value)
         : value
       self.set(value)
-    }
-    _.on(el, 'change', this.listener)
+    })
+
+    // check initial value (inline selected attribute)
     checkInitialValue.call(this)
+
     // All major browsers except Firefox resets
     // selectedIndex with value -1 to 0 when the element
     // is appended to a new parent, therefore we have to
@@ -4805,7 +4912,7 @@ module.exports = {
   update: function (value) {
     var el = this.el
     el.selectedIndex = -1
-    if (!value && value !== 0) {
+    if (value == null) {
       if (this.defaultOption) {
         this.defaultOption.selected = true
       }
@@ -4814,25 +4921,26 @@ module.exports = {
     var multi = this.multiple && _.isArray(value)
     var options = el.options
     var i = options.length
-    var option
+    var op, val
     while (i--) {
-      option = options[i]
+      op = options[i]
+      val = op.hasOwnProperty('_value')
+        ? op._value
+        : op.value
       /* eslint-disable eqeqeq */
-      option.selected = multi
-        ? indexOf(value, option.value) > -1
-        : value == option.value
+      op.selected = multi
+        ? indexOf(value, val) > -1
+        : _.looseEqual(value, val)
       /* eslint-enable eqeqeq */
     }
   },
 
   unbind: function () {
-    _.off(this.el, 'change', this.listener)
     this.vm.$off('hook:attached', this.forceUpdate)
     if (this.optionWatcher) {
       this.optionWatcher.teardown()
     }
   }
-
 }
 
 /**
@@ -4855,7 +4963,13 @@ function initOptions (expression) {
       while (i--) {
         var option = el.options[i]
         if (option !== defaultOption) {
-          el.removeChild(option)
+          var parentNode = option.parentNode
+          if (parentNode === el) {
+            parentNode.removeChild(option)
+          } else {
+            el.removeChild(parentNode)
+            i = el.options.length
+          }
         }
       }
       buildOptions(el, value)
@@ -4894,13 +5008,16 @@ function buildOptions (parent, options) {
     op = options[i]
     if (!op.options) {
       el = document.createElement('option')
-      if (typeof op === 'string') {
+      if (typeof op === 'string' || typeof op === 'number') {
         el.text = el.value = op
       } else {
-        if (op.value != null) {
+        if (op.value != null && !_.isObject(op.value)) {
           el.value = op.value
         }
-        el.text = op.text || op.value || ''
+        // object values gets serialized when set as value,
+        // so we store the raw value as a different property
+        el._value = op.value
+        el.text = op.text || ''
         if (op.disabled) {
           el.disabled = true
         }
@@ -4939,29 +5056,35 @@ function checkInitialValue () {
 }
 
 /**
- * Helper to extract a value array for select[multiple]
+ * Get select value
  *
  * @param {SelectElement} el
- * @return {Array}
+ * @param {Boolean} multi
+ * @return {Array|*}
  */
 
-function getMultiValue (el) {
-  return Array.prototype.filter
-    .call(el.options, filterSelected)
-    .map(getOptionValue)
-}
-
-function filterSelected (op) {
-  return op.selected
-}
-
-function getOptionValue (op) {
-  return op.value || op.text
+function getValue (el, multi) {
+  var res = multi ? [] : null
+  var op, val
+  for (var i = 0, l = el.options.length; i < l; i++) {
+    op = el.options[i]
+    if (op.selected) {
+      val = op.hasOwnProperty('_value')
+        ? op._value
+        : op.value
+      if (multi) {
+        res.push(val)
+      } else {
+        return val
+      }
+    }
+  }
+  return res
 }
 
 /**
  * Native Array.indexOf uses strict equal, but in this
- * case we need to match string/numbers with soft equal.
+ * case we need to match string/numbers with custom equal.
  *
  * @param {Array} arr
  * @param {*} val
@@ -4970,15 +5093,15 @@ function getOptionValue (op) {
 function indexOf (arr, val) {
   var i = arr.length
   while (i--) {
-    /* eslint-disable eqeqeq */
-    if (arr[i] == val) return i
-    /* eslint-enable eqeqeq */
+    if (_.looseEqual(arr[i], val)) {
+      return i
+    }
   }
   return -1
 }
 
 }).call(this,require('_process'))
-},{"../../parsers/directive":59,"../../util":71,"../../watcher":75,"_process":80}],36:[function(require,module,exports){
+},{"../../parsers/directive":59,"../../util":71,"../../watcher":75,"_process":79}],36:[function(require,module,exports){
 var _ = require('../../util')
 
 module.exports = {
@@ -4986,6 +5109,7 @@ module.exports = {
   bind: function () {
     var self = this
     var el = this.el
+    var isRange = el.type === 'range'
 
     // check params
     // - lazy: update model on "change" instead of "input"
@@ -5003,78 +5127,55 @@ module.exports = {
     // Chinese, but instead triggers them for spelling
     // suggestions... (see Discussion/#162)
     var composing = false
-    if (!_.isAndroid) {
-      this.onComposeStart = function () {
+    if (!_.isAndroid && !isRange) {
+      this.on('compositionstart', function () {
         composing = true
-      }
-      this.onComposeEnd = function () {
+      })
+      this.on('compositionend', function () {
         composing = false
         // in IE11 the "compositionend" event fires AFTER
         // the "input" event, so the input handler is blocked
         // at the end... have to call it here.
-        self.listener()
-      }
-      _.on(el, 'compositionstart', this.onComposeStart)
-      _.on(el, 'compositionend', this.onComposeEnd)
+        //
+        // #1327: in lazy mode this is unecessary.
+        if (!lazy) {
+          self.listener()
+        }
+      })
     }
 
-    function syncToModel () {
-      var val = number
+    // prevent messing with the input when user is typing,
+    // and force update on blur.
+    this.focused = false
+    if (!isRange) {
+      this.on('focus', function () {
+        self.focused = true
+      })
+      this.on('blur', function () {
+        self.focused = false
+        self.listener()
+      })
+    }
+
+    // Now attach the main listener
+    this.listener = function () {
+      if (composing) return
+      var val = number || isRange
         ? _.toNumber(el.value)
         : el.value
       self.set(val)
-    }
-
-    // if the directive has filters, we need to
-    // record cursor position and restore it after updating
-    // the input with the filtered value.
-    // also force update for type="range" inputs to enable
-    // "lock in range" (see #506)
-    if (this.hasRead || el.type === 'range') {
-      this.listener = function () {
-        if (composing) return
-        var charsOffset
-        // some HTML5 input types throw error here
-        try {
-          // record how many chars from the end of input
-          // the cursor was at
-          charsOffset = el.value.length - el.selectionStart
-        } catch (e) {}
-        // Fix IE10/11 infinite update cycle
-        // https://github.com/yyx990803/vue/issues/592
-        /* istanbul ignore if */
-        if (charsOffset < 0) {
-          return
+      // force update on next tick to avoid lock & same value
+      // also only update when user is not typing
+      _.nextTick(function () {
+        if (self._bound && !self.focused) {
+          self.update(self._watcher.value)
         }
-        syncToModel()
-        _.nextTick(function () {
-          // force a value update, because in
-          // certain cases the write filters output the
-          // same result for different input values, and
-          // the Observer set events won't be triggered.
-          var newVal = self._watcher.value
-          self.update(newVal)
-          if (charsOffset != null) {
-            var cursorPos =
-              _.toString(newVal).length - charsOffset
-            el.setSelectionRange(cursorPos, cursorPos)
-          }
-        })
-      }
-    } else {
-      this.listener = function () {
-        if (composing) return
-        syncToModel()
-      }
+      })
     }
-
     if (debounce) {
       this.listener = _.debounce(this.listener, debounce)
     }
 
-    // Now attach the main listener
-
-    this.event = lazy ? 'change' : 'input'
     // Support jQuery events, since jQuery.trigger() doesn't
     // trigger native events in some cases and some plugins
     // rely on $.trigger()
@@ -5087,23 +5188,27 @@ module.exports = {
     // jQuery variable in tests.
     this.hasjQuery = typeof jQuery === 'function'
     if (this.hasjQuery) {
-      jQuery(el).on(this.event, this.listener)
+      jQuery(el).on('change', this.listener)
+      if (!lazy) {
+        jQuery(el).on('input', this.listener)
+      }
     } else {
-      _.on(el, this.event, this.listener)
+      this.on('change', this.listener)
+      if (!lazy) {
+        this.on('input', this.listener)
+      }
     }
 
     // IE9 doesn't fire input event on backspace/del/cut
     if (!lazy && _.isIE9) {
-      this.onCut = function () {
+      this.on('cut', function () {
         _.nextTick(self.listener)
-      }
-      this.onDel = function (e) {
+      })
+      this.on('keyup', function (e) {
         if (e.keyCode === 46 || e.keyCode === 8) {
           self.listener()
         }
-      }
-      _.on(el, 'cut', this.onCut)
-      _.on(el, 'keyup', this.onDel)
+      })
     }
 
     // set initial value if present
@@ -5124,17 +5229,8 @@ module.exports = {
   unbind: function () {
     var el = this.el
     if (this.hasjQuery) {
-      jQuery(el).off(this.event, this.listener)
-    } else {
-      _.off(el, this.event, this.listener)
-    }
-    if (this.onComposeStart) {
-      _.off(el, 'compositionstart', this.onComposeStart)
-      _.off(el, 'compositionend', this.onComposeEnd)
-    }
-    if (this.onCut) {
-      _.off(el, 'cut', this.onCut)
-      _.off(el, 'keyup', this.onDel)
+      jQuery(el).off('change', this.listener)
+      jQuery(el).off('input', this.listener)
     }
   }
 }
@@ -5158,7 +5254,7 @@ module.exports = {
       this.iframeBind = function () {
         _.on(self.el.contentWindow, self.arg, self.handler)
       }
-      _.on(this.el, 'load', this.iframeBind)
+      this.on('load', this.iframeBind)
     }
   },
 
@@ -5198,12 +5294,11 @@ module.exports = {
 
   unbind: function () {
     this.reset()
-    _.off(this.el, 'load', this.iframeBind)
   }
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":80}],38:[function(require,module,exports){
+},{"../util":71,"_process":79}],38:[function(require,module,exports){
 // NOTE: the prop internal directive is compiled and linked
 // during _initScope(), before the created hook is called.
 // The purpose is to make the initial prop values available
@@ -5231,7 +5326,7 @@ module.exports = {
         if (_.assertProp(prop, val)) {
           child[childKey] = val
         }
-      }
+      }, { sync: true }
     )
 
     // set the child initial value.
@@ -5253,7 +5348,7 @@ module.exports = {
           childKey,
           function (val) {
             parent.$set(parentKey, val)
-          }
+          }, { sync: true }
         )
       })
     }
@@ -5293,7 +5388,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":80}],40:[function(require,module,exports){
+},{"../util":71,"_process":79}],40:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var config = require('../config')
@@ -5318,6 +5413,21 @@ module.exports = {
    */
 
   bind: function () {
+
+    // some helpful tips...
+    /* istanbul ignore if */
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      this.el.tagName === 'OPTION' &&
+      this.el.parentNode && this.el.parentNode.__v_model
+    ) {
+      _.warn(
+        'Don\'t use v-repeat for v-model options; ' +
+        'use the `options` param instead: ' +
+        'http://vuejs.org/guide/forms.html#Dynamic_Select_Options'
+      )
+    }
+
     // support for item in array syntax
     var inMatch = this.expression.match(/(.*) in (.*)/)
     if (inMatch) {
@@ -5356,19 +5466,6 @@ module.exports = {
 
     // create cache object
     this.cache = Object.create(null)
-
-    // some helpful tips...
-    /* istanbul ignore if */
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      this.el.tagName === 'OPTION'
-    ) {
-      _.warn(
-        'Don\'t use v-repeat for v-model options; ' +
-        'use the `options` param instead: ' +
-        'http://vuejs.org/guide/forms.html#Dynamic_Select_Options'
-      )
-    }
   },
 
   /**
@@ -5439,7 +5536,7 @@ module.exports = {
     }, this))
   },
 
-    /**
+  /**
    * Resolve a dynamic component to use for an instance.
    * The tricky part here is that there could be dynamic
    * components depending on instance data.
@@ -5487,6 +5584,12 @@ module.exports = {
    */
 
   update: function (data) {
+    if (process.env.NODE_ENV !== 'production' && !_.isArray(data)) {
+      _.warn(
+        'v-repeat pre-converts Objects into Arrays, and ' +
+        'v-repeat filters should always return Arrays.'
+      )
+    }
     if (this.componentId) {
       var state = this.componentState
       if (state === UNRESOLVED) {
@@ -5560,6 +5663,14 @@ module.exports = {
       primitive = !isObject(raw)
       vm = !init && this.getVm(raw, i, converted ? obj.$key : null)
       if (vm) { // reusable instance
+
+        if (process.env.NODE_ENV !== 'production' && vm._reused) {
+          _.warn(
+            'Duplicate objects found in v-repeat="' + this.expression + '": ' +
+            JSON.stringify(raw)
+          )
+        }
+
         vm._reused = true
         vm.$index = i // update $index
         // update data for track-by or object repeat,
@@ -5757,7 +5868,7 @@ module.exports = {
         cache[id] = vm
       } else if (!primitive && idKey !== '$index') {
         process.env.NODE_ENV !== 'production' && _.warn(
-          'Duplicate track-by key in v-repeat: ' + id
+          'Duplicate objects with the same track-by key in v-repeat: ' + id
         )
       }
     } else {
@@ -5767,8 +5878,8 @@ module.exports = {
           data[id] = vm
         } else {
           process.env.NODE_ENV !== 'production' && _.warn(
-            'Duplicate objects are not supported in v-repeat ' +
-            'when using components or transitions.'
+            'Duplicate objects found in v-repeat="' + this.expression + '": ' +
+            JSON.stringify(data)
           )
         }
       } else {
@@ -6051,7 +6162,7 @@ function isPrimitive (value) {
 }
 
 }).call(this,require('_process'))
-},{"../compiler":20,"../config":22,"../parsers/expression":60,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":80}],41:[function(require,module,exports){
+},{"../compiler":20,"../config":22,"../parsers/expression":60,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":79}],41:[function(require,module,exports){
 var transition = require('../transition')
 
 module.exports = function (value) {
@@ -6411,7 +6522,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../compiler":20,"../directives/if":30,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":80}],48:[function(require,module,exports){
+},{"../cache":17,"../compiler":20,"../directives/if":30,"../parsers/template":62,"../parsers/text":63,"../util":71,"_process":79}],48:[function(require,module,exports){
 var _ = require('../util')
 var Path = require('../parsers/path')
 
@@ -6423,21 +6534,30 @@ var Path = require('../parsers/path')
  * @param {String} dataKey
  */
 
-exports.filterBy = function (arr, search, delimiter, dataKey) {
-  // allow optional `in` delimiter
-  // because why not
-  if (delimiter && delimiter !== 'in') {
-    dataKey = delimiter
-  }
+exports.filterBy = function (arr, search, delimiter /* ...dataKeys */) {
   if (search == null) {
     return arr
   }
+  if (typeof search === 'function') {
+    return arr.filter(search)
+  }
   // cast to lowercase string
   search = ('' + search).toLowerCase()
+  // allow optional `in` delimiter
+  // because why not
+  var n = delimiter === 'in' ? 3 : 2
+  // extract and flatten keys
+  var keys = _.toArray(arguments, n).reduce(function (prev, cur) {
+    return prev.concat(cur)
+  }, [])
   return arr.filter(function (item) {
-    return dataKey
-      ? contains(Path.get(item, dataKey), search)
-      : contains(item, search)
+    if (keys.length) {
+      return keys.some(function (key) {
+        return contains(Path.get(item, key), search)
+      })
+    } else {
+      return contains(item, search)
+    }
   })
 }
 
@@ -6480,14 +6600,17 @@ exports.orderBy = function (arr, sortKey, reverse) {
  */
 
 function contains (val, search) {
+  var i
   if (_.isPlainObject(val)) {
-    for (var key in val) {
-      if (contains(val[key], search)) {
+    var keys = Object.keys(val)
+    i = keys.length
+    while (i--) {
+      if (contains(val[keys[i]], search)) {
         return true
       }
     }
   } else if (_.isArray(val)) {
-    var i = val.length
+    i = val.length
     while (i--) {
       if (contains(val[i], search)) {
         return true
@@ -6562,7 +6685,7 @@ var digitsRE = /(\d{3})(?=\d)/g
 exports.currency = function (value, currency) {
   value = parseFloat(value)
   if (!isFinite(value) || (!value && value !== 0)) return ''
-  currency = currency || '$'
+  currency = currency != null ? currency : '$'
   var stringified = Math.abs(value).toFixed(2)
   var _int = stringified.slice(0, -3)
   var i = _int.length % 3
@@ -6608,6 +6731,7 @@ var keyCodes = {
   esc: 27,
   tab: 9,
   enter: 13,
+  space: 32,
   'delete': 46,
   up: 38,
   left: 37,
@@ -6630,6 +6754,14 @@ exports.key = function (handler, key) {
 
 // expose keycode hash
 exports.key.keyCodes = keyCodes
+
+exports.debounce = function (handler, delay) {
+  if (!handler) return
+  if (!delay) {
+    delay = 300
+  }
+  return _.debounce(handler, delay)
+}
 
 /**
  * Install special array filters
@@ -6982,7 +7114,7 @@ exports._callHook = function (hook) {
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":80}],52:[function(require,module,exports){
+},{"../util":71,"_process":79}],52:[function(require,module,exports){
 var mergeOptions = require('../util').mergeOptions
 
 /**
@@ -7170,7 +7302,7 @@ exports._resolveComponent = function (id, cb) {
 }
 
 }).call(this,require('_process'))
-},{"../util":71,"_process":80}],54:[function(require,module,exports){
+},{"../util":71,"_process":79}],54:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var compiler = require('../compiler')
@@ -7210,7 +7342,7 @@ exports._initProps = function () {
   }
   // make sure to convert string selectors into element now
   el = options.el = _.query(el)
-  this._propsUnlinkFn = el && props
+  this._propsUnlinkFn = el && el.nodeType === 1 && props
     ? compiler.compileAndLinkProps(
         this, el, props
       )
@@ -7373,7 +7505,9 @@ exports._initComputed = function () {
         def.set = noop
       } else {
         def.get = userDef.get
-          ? makeComputedGetter(userDef.get, this)
+          ? userDef.cache !== false
+            ? makeComputedGetter(userDef.get, this)
+            : _.bind(userDef.get, this)
           : noop
         def.set = userDef.set
           ? _.bind(userDef.set, this)
@@ -7438,8 +7572,6 @@ exports._initMeta = function () {
 exports._defineMeta = function (key, value) {
   var dep = new Dep()
   Object.defineProperty(this, key, {
-    enumerable: true,
-    configurable: true,
     get: function metaGetter () {
       if (Dep.target) {
         dep.depend()
@@ -7456,7 +7588,7 @@ exports._defineMeta = function (key, value) {
 }
 
 }).call(this,require('_process'))
-},{"../compiler":20,"../observer":57,"../observer/dep":56,"../util":71,"../watcher":75,"_process":80}],55:[function(require,module,exports){
+},{"../compiler":20,"../observer":57,"../observer/dep":56,"../util":71,"../watcher":75,"_process":79}],55:[function(require,module,exports){
 var _ = require('../util')
 var arrayProto = Array.prototype
 var arrayMethods = Object.create(arrayProto)
@@ -7487,7 +7619,7 @@ var arrayMethods = Object.create(arrayProto)
     }
     var result = original.apply(this, args)
     var ob = this.__ob__
-    var inserted
+    var inserted, removed
     switch (method) {
       case 'push':
         inserted = args
@@ -7497,11 +7629,17 @@ var arrayMethods = Object.create(arrayProto)
         break
       case 'splice':
         inserted = args.slice(2)
+        removed = result
+        break
+      case 'pop':
+      case 'shift':
+        removed = [result]
         break
     }
     if (inserted) ob.observeArray(inserted)
+    if (removed) ob.unobserveArray(removed)
     // notify change
-    ob.dep.notify()
+    ob.notify()
     return result
   })
 })
@@ -7552,6 +7690,7 @@ module.exports = arrayMethods
 
 },{"../util":71}],56:[function(require,module,exports){
 var _ = require('../util')
+var uid = 0
 
 /**
  * A dep is an observable that can have multiple
@@ -7561,6 +7700,7 @@ var _ = require('../util')
  */
 
 function Dep () {
+  this.id = uid++
   this.subs = []
 }
 
@@ -7569,15 +7709,13 @@ function Dep () {
 // watcher being evaluated at any time.
 Dep.target = null
 
-var p = Dep.prototype
-
 /**
  * Add a directive subscriber.
  *
  * @param {Directive} sub
  */
 
-p.addSub = function (sub) {
+Dep.prototype.addSub = function (sub) {
   this.subs.push(sub)
 }
 
@@ -7587,7 +7725,7 @@ p.addSub = function (sub) {
  * @param {Directive} sub
  */
 
-p.removeSub = function (sub) {
+Dep.prototype.removeSub = function (sub) {
   this.subs.$remove(sub)
 }
 
@@ -7595,7 +7733,7 @@ p.removeSub = function (sub) {
  * Add self as a dependency to the target watcher.
  */
 
-p.depend = function () {
+Dep.prototype.depend = function () {
   Dep.target.addDep(this)
 }
 
@@ -7603,7 +7741,7 @@ p.depend = function () {
  * Notify all subscribers of a new value.
  */
 
-p.notify = function () {
+Dep.prototype.notify = function () {
   // stablize the subscriber list first
   var subs = _.toArray(this.subs)
   for (var i = 0, l = subs.length; i < l; i++) {
@@ -7668,7 +7806,7 @@ Observer.create = function (value, vm) {
   ) {
     ob = value.__ob__
   } else if (
-    _.isObject(value) &&
+    (_.isArray(value) || _.isPlainObject(value)) &&
     !Object.isFrozen(value) &&
     !value._isVue
   ) {
@@ -7682,8 +7820,6 @@ Observer.create = function (value, vm) {
 
 // Instance methods
 
-var p = Observer.prototype
-
 /**
  * Walk through each property and convert them into
  * getter/setters. This method should only be called when
@@ -7693,16 +7829,11 @@ var p = Observer.prototype
  * @param {Object} obj
  */
 
-p.walk = function (obj) {
+Observer.prototype.walk = function (obj) {
   var keys = Object.keys(obj)
   var i = keys.length
-  var key, prefix
   while (i--) {
-    key = keys[i]
-    prefix = key.charCodeAt(0)
-    if (prefix !== 0x24 && prefix !== 0x5F) { // skip $ or _
-      this.convert(key, obj[key])
-    }
+    this.convert(keys[i], obj[keys[i]])
   }
 }
 
@@ -7714,7 +7845,7 @@ p.walk = function (obj) {
  * @return {Dep|undefined}
  */
 
-p.observe = function (val) {
+Observer.prototype.observe = function (val) {
   return Observer.create(val)
 }
 
@@ -7724,10 +7855,45 @@ p.observe = function (val) {
  * @param {Array} items
  */
 
-p.observeArray = function (items) {
+Observer.prototype.observeArray = function (items) {
   var i = items.length
   while (i--) {
-    this.observe(items[i])
+    var ob = this.observe(items[i])
+    if (ob) {
+      (ob.parents || (ob.parents = [])).push(this)
+    }
+  }
+}
+
+/**
+ * Remove self from the parent list of removed objects.
+ *
+ * @param {Array} items
+ */
+
+Observer.prototype.unobserveArray = function (items) {
+  var i = items.length
+  while (i--) {
+    var ob = items[i] && items[i].__ob__
+    if (ob) {
+      ob.parents.$remove(this)
+    }
+  }
+}
+
+/**
+ * Notify self dependency, and also parent Array dependency
+ * if any.
+ */
+
+Observer.prototype.notify = function () {
+  this.dep.notify()
+  var parents = this.parents
+  if (parents) {
+    var i = parents.length
+    while (i--) {
+      parents[i].notify()
+    }
   }
 }
 
@@ -7739,7 +7905,7 @@ p.observeArray = function (items) {
  * @param {*} val
  */
 
-p.convert = function (key, val) {
+Observer.prototype.convert = function (key, val) {
   var ob = this
   var childOb = ob.observe(val)
   var dep = new Dep()
@@ -7751,12 +7917,6 @@ p.convert = function (key, val) {
         dep.depend()
         if (childOb) {
           childOb.dep.depend()
-        }
-        if (_.isArray(val)) {
-          for (var e, i = 0, l = val.length; i < l; i++) {
-            e = val[i]
-            e && e.__ob__ && e.__ob__.dep.depend()
-          }
         }
       }
       return val
@@ -7779,7 +7939,7 @@ p.convert = function (key, val) {
  * @param {Vue} vm
  */
 
-p.addVm = function (vm) {
+Observer.prototype.addVm = function (vm) {
   (this.vms || (this.vms = [])).push(vm)
 }
 
@@ -7790,7 +7950,7 @@ p.addVm = function (vm) {
  * @param {Vue} vm
  */
 
-p.removeVm = function (vm) {
+Observer.prototype.removeVm = function (vm) {
   this.vms.$remove(vm)
 }
 
@@ -7851,7 +8011,7 @@ _.define(
       return
     }
     ob.convert(key, val)
-    ob.dep.notify()
+    ob.notify()
     if (ob.vms) {
       var i = ob.vms.length
       while (i--) {
@@ -7899,7 +8059,7 @@ _.define(
     if (!ob || _.isReserved(key)) {
       return
     }
-    ob.dep.notify()
+    ob.notify()
     if (ob.vms) {
       var i = ob.vms.length
       while (i--) {
@@ -7916,7 +8076,7 @@ var _ = require('../util')
 var Cache = require('../cache')
 var cache = new Cache(1000)
 var argRE = /^[^\{\?]+$|^'[^']*'$|^"[^"]*"$/
-var filterTokenRE = /[^\s'"]+|'[^']+'|"[^"]+"/g
+var filterTokenRE = /[^\s'"]+|'[^']*'|"[^"]*"/g
 var reservedArgRE = /^in$|^-?\d+/
 
 /**
@@ -7985,9 +8145,10 @@ function processFilterArg (arg) {
   var stripped = reservedArgRE.test(arg)
     ? arg
     : _.stripQuotes(arg)
+  var dynamic = stripped === false
   return {
-    value: stripped || arg,
-    dynamic: !stripped
+    value: dynamic ? arg : stripped,
+    dynamic: dynamic
   }
 }
 
@@ -8360,7 +8521,7 @@ exports.isSimplePath = function (exp) {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../util":71,"./path":61,"_process":80}],61:[function(require,module,exports){
+},{"../cache":17,"../util":71,"./path":61,"_process":79}],61:[function(require,module,exports){
 (function (process){
 var _ = require('../util')
 var Cache = require('../cache')
@@ -8712,7 +8873,7 @@ function warnNonExistent (path) {
 }
 
 }).call(this,require('_process'))
-},{"../cache":17,"../util":71,"_process":80}],62:[function(require,module,exports){
+},{"../cache":17,"../util":71,"_process":79}],62:[function(require,module,exports){
 var _ = require('../util')
 var Cache = require('../cache')
 var templateCache = new Cache(1000)
@@ -8785,7 +8946,7 @@ function isRealTemplate (node) {
 }
 
 var tagRE = /<([\w:]+)/
-var entityRE = /&\w+;/
+var entityRE = /&\w+;|&#\d+;|&#x[\dA-F]+;/
 
 /**
  * Convert a string template to a DocumentFragment.
@@ -8871,22 +9032,28 @@ function nodeToFragment (node) {
 
 // Test for the presence of the Safari template cloning bug
 // https://bugs.webkit.org/show_bug.cgi?id=137755
-var hasBrokenTemplate = _.inBrowser
-  ? (function () {
-      var a = document.createElement('div')
-      a.innerHTML = '<template>1</template>'
-      return !a.cloneNode(true).firstChild.innerHTML
-    })()
-  : false
+var hasBrokenTemplate = (function () {
+  /* istanbul ignore else */
+  if (_.inBrowser) {
+    var a = document.createElement('div')
+    a.innerHTML = '<template>1</template>'
+    return !a.cloneNode(true).firstChild.innerHTML
+  } else {
+    return false
+  }
+})()
 
 // Test for IE10/11 textarea placeholder clone bug
-var hasTextareaCloneBug = _.inBrowser
-  ? (function () {
-      var t = document.createElement('textarea')
-      t.placeholder = 't'
-      return t.cloneNode(true).value === 't'
-    })()
-  : false
+var hasTextareaCloneBug = (function () {
+  /* istanbul ignore else */
+  if (_.inBrowser) {
+    var t = document.createElement('textarea')
+    t.placeholder = 't'
+    return t.cloneNode(true).value === 't'
+  } else {
+    return false
+  }
+})()
 
 /**
  * 1. Deal with Safari cloning nested <template> bug by
@@ -9117,11 +9284,13 @@ exports.parse = function (text) {
  */
 
 exports.tokensToExp = function (tokens, vm) {
-  return tokens.length > 1
-    ? tokens.map(function (token) {
-        return formatToken(token, vm)
-      }).join('+')
-    : formatToken(tokens[0], vm, true)
+  if (tokens.length > 1) {
+    return tokens.map(function (token) {
+      return formatToken(token, vm)
+    }).join('+')
+  } else {
+    return formatToken(tokens[0], vm, true)
+  }
 }
 
 /**
@@ -9381,6 +9550,7 @@ function Transition (el, id, hooks, vm) {
   this.op =
   this.cb = null
   this.justEntered = false
+  this.entered = this.left = false
   this.typeCache = {}
   // bind
   var self = this
@@ -9423,7 +9593,11 @@ p.enter = function (op, cb) {
   this.cb = cb
   addClass(this.el, this.enterClass)
   op()
+  this.entered = false
   this.callHookWithCb('enter')
+  if (this.entered) {
+    return // user called done synchronously.
+  }
   this.cancel = this.hooks && this.hooks.enterCancelled
   queue.push(this.enterNextTick)
 }
@@ -9439,16 +9613,20 @@ p.enterNextTick = function () {
   _.nextTick(function () {
     this.justEntered = false
   }, this)
-  var type = this.getCssTransitionType(this.enterClass)
   var enterDone = this.enterDone
-  if (type === TYPE_TRANSITION) {
-    // trigger transition by removing enter class now
+  var type = this.getCssTransitionType(this.enterClass)
+  if (!this.pendingJsCb) {
+    if (type === TYPE_TRANSITION) {
+      // trigger transition by removing enter class now
+      removeClass(this.el, this.enterClass)
+      this.setupCssCb(transitionEndEvent, enterDone)
+    } else if (type === TYPE_ANIMATION) {
+      this.setupCssCb(animationEndEvent, enterDone)
+    } else {
+      enterDone()
+    }
+  } else if (type === TYPE_TRANSITION) {
     removeClass(this.el, this.enterClass)
-    this.setupCssCb(transitionEndEvent, enterDone)
-  } else if (type === TYPE_ANIMATION) {
-    this.setupCssCb(animationEndEvent, enterDone)
-  } else if (!this.pendingJsCb) {
-    enterDone()
   }
 }
 
@@ -9457,6 +9635,7 @@ p.enterNextTick = function () {
  */
 
 p.enterDone = function () {
+  this.entered = true
   this.cancel = this.pendingJsCb = null
   removeClass(this.el, this.enterClass)
   this.callHook('afterEnter')
@@ -9490,7 +9669,11 @@ p.leave = function (op, cb) {
   this.op = op
   this.cb = cb
   addClass(this.el, this.leaveClass)
+  this.left = false
   this.callHookWithCb('leave')
+  if (this.left) {
+    return // user called done synchronously.
+  }
   this.cancel = this.hooks && this.hooks.leaveCancelled
   // only need to handle leaveDone if
   // 1. the transition is already done (synchronously called
@@ -9529,6 +9712,7 @@ p.leaveNextTick = function () {
  */
 
 p.leaveDone = function () {
+  this.left = true
   this.cancel = this.pendingJsCb = null
   this.op()
   removeClass(this.el, this.leaveClass)
@@ -9617,7 +9801,9 @@ p.getCssTransitionType = function (className) {
     // CSS transitions.
     document.hidden ||
     // explicit js-only transition
-    (this.hooks && this.hooks.css === false)
+    (this.hooks && this.hooks.css === false) ||
+    // element is hidden
+    isHidden(this.el)
   ) {
     return
   }
@@ -9665,6 +9851,20 @@ p.setupCssCb = function (event, cb) {
     }
   }
   _.on(el, event, onEnd)
+}
+
+/**
+ * Check if an element is hidden - in that case we can just
+ * skip the transition alltogether.
+ *
+ * @param {Element} el
+ * @return {Boolean}
+ */
+
+function isHidden (el) {
+  return el.style.display === 'none' ||
+    el.style.visibility === 'hidden' ||
+    el.hidden
 }
 
 module.exports = Transition
@@ -9797,7 +9997,7 @@ function formatValue (val) {
 }
 
 }).call(this,require('_process'))
-},{"./index":71,"_process":80}],68:[function(require,module,exports){
+},{"./index":71,"_process":79}],68:[function(require,module,exports){
 (function (process){
 /**
  * Enable debug utilities.
@@ -9865,7 +10065,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"_process":80}],69:[function(require,module,exports){
+},{"../config":22,"_process":79}],69:[function(require,module,exports){
 (function (process){
 var _ = require('./index')
 var config = require('../config')
@@ -10141,7 +10341,7 @@ exports.createAnchor = function (content, persist) {
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"./index":71,"_process":80}],70:[function(require,module,exports){
+},{"../config":22,"./index":71,"_process":79}],70:[function(require,module,exports){
 // can we use __proto__?
 exports.hasProto = '__proto__' in {}
 
@@ -10194,7 +10394,7 @@ exports.nextTick = (function () {
   var callbacks = []
   var pending = false
   var timerFunc
-  function handle () {
+  function nextTickHandler () {
     pending = false
     var copies = callbacks.slice(0)
     callbacks = []
@@ -10205,7 +10405,7 @@ exports.nextTick = (function () {
   /* istanbul ignore if */
   if (typeof MutationObserver !== 'undefined') {
     var counter = 1
-    var observer = new MutationObserver(handle)
+    var observer = new MutationObserver(nextTickHandler)
     var textNode = document.createTextNode(counter)
     observer.observe(textNode, {
       characterData: true
@@ -10224,7 +10424,7 @@ exports.nextTick = (function () {
     callbacks.push(func)
     if (pending) return
     pending = true
-    timerFunc(handle, 0)
+    timerFunc(nextTickHandler, 0)
   }
 })()
 
@@ -10241,7 +10441,7 @@ extend(exports, require('./debug'))
 
 },{"./component":67,"./debug":68,"./dom":69,"./env":70,"./lang":72,"./options":73}],72:[function(require,module,exports){
 /**
- * Check is a string starts with $ or _
+ * Check if a string starts with $ or _
  *
  * @param {String} str
  * @return {Boolean}
@@ -10433,8 +10633,9 @@ exports.isObject = function (obj) {
  */
 
 var toString = Object.prototype.toString
+var OBJECT_STRING = '[object Object]'
 exports.isPlainObject = function (obj) {
-  return toString.call(obj) === '[object Object]'
+  return toString.call(obj) === OBJECT_STRING
 }
 
 /**
@@ -10505,7 +10706,8 @@ exports.debounce = function (func, wait) {
  */
 
 exports.indexOf = function (arr, obj) {
-  for (var i = 0, l = arr.length; i < l; i++) {
+  var i = arr.length
+  while (i--) {
     if (arr[i] === obj) return i
   }
   return -1
@@ -10530,6 +10732,25 @@ exports.cancellable = function (fn) {
   return cb
 }
 
+/**
+ * Check if two values are loosely equal - that is,
+ * if they are plain objects, do they have the same shape?
+ *
+ * @param {*} a
+ * @param {*} b
+ * @return {Boolean}
+ */
+
+exports.looseEqual = function (a, b) {
+  /* eslint-disable eqeqeq */
+  return a == b || (
+    exports.isObject(a) && exports.isObject(b)
+      ? JSON.stringify(a) === JSON.stringify(b)
+      : false
+  )
+  /* eslint-enable eqeqeq */
+}
+
 },{}],73:[function(require,module,exports){
 (function (process){
 var _ = require('./index')
@@ -10548,7 +10769,7 @@ var extend = _.extend
  * @param {Vue} [vm]
  */
 
-var strats = Object.create(null)
+var strats = config.optionMergeStrategies = Object.create(null)
 
 /**
  * Helper that recursively merges two data objects together.
@@ -10875,19 +11096,23 @@ exports.mergeOptions = function merge (parent, child, vm) {
 
 exports.resolveAsset = function resolve (options, type, id) {
   var camelizedId = _.camelize(id)
-  var asset = options[type][id] || options[type][camelizedId]
+  var pascalizedId = camelizedId.charAt(0).toUpperCase() + camelizedId.slice(1)
+  var assets = options[type]
+  var asset = assets[id] || assets[camelizedId] || assets[pascalizedId]
   while (
-    !asset && options._parent &&
+    !asset &&
+    options._parent &&
     (!config.strict || options._repeat)
   ) {
-    options = options._parent.$options
-    asset = options[type][id] || options[type][camelizedId]
+    options = (options._context || options._parent).$options
+    assets = options[type]
+    asset = assets[id] || assets[camelizedId] || assets[pascalizedId]
   }
   return asset
 }
 
 }).call(this,require('_process'))
-},{"../config":22,"./index":71,"_process":80}],74:[function(require,module,exports){
+},{"../config":22,"./index":71,"_process":79}],74:[function(require,module,exports){
 var _ = require('./util')
 var extend = _.extend
 
@@ -11000,12 +11225,17 @@ var uid = 0
  *                 - {Boolean} twoWay
  *                 - {Boolean} deep
  *                 - {Boolean} user
+ *                 - {Boolean} sync
  *                 - {Boolean} lazy
  *                 - {Function} [preProcess]
  * @constructor
  */
 
 function Watcher (vm, expOrFn, cb, options) {
+  // mix in options
+  if (options) {
+    _.extend(this, options)
+  }
   var isFn = typeof expOrFn === 'function'
   this.vm = vm
   vm._watchers.push(this)
@@ -11013,22 +11243,16 @@ function Watcher (vm, expOrFn, cb, options) {
   this.cb = cb
   this.id = ++uid // uid for batching
   this.active = true
-  options = options || {}
-  this.deep = !!options.deep
-  this.user = !!options.user
-  this.twoWay = !!options.twoWay
-  this.lazy = !!options.lazy
-  this.dirty = this.lazy
-  this.filters = options.filters
-  this.preProcess = options.preProcess
-  this.deps = []
+  this.dirty = this.lazy // for lazy watchers
+  this.deps = Object.create(null)
   this.newDeps = null
+  this.prevError = null // for async error stacks
   // parse expression for getter/setter
   if (isFn) {
     this.getter = expOrFn
     this.setter = undefined
   } else {
-    var res = expParser.parse(expOrFn, options.twoWay)
+    var res = expParser.parse(expOrFn, this.twoWay)
     this.getter = res.get
     this.setter = res.set
   }
@@ -11040,24 +11264,19 @@ function Watcher (vm, expOrFn, cb, options) {
   this.queued = this.shallow = false
 }
 
-var p = Watcher.prototype
-
 /**
  * Add a dependency to this directive.
  *
  * @param {Dep} dep
  */
 
-p.addDep = function (dep) {
-  var newDeps = this.newDeps
-  var old = this.deps
-  if (_.indexOf(newDeps, dep) < 0) {
-    newDeps.push(dep)
-    var i = _.indexOf(old, dep)
-    if (i < 0) {
+Watcher.prototype.addDep = function (dep) {
+  var id = dep.id
+  if (!this.newDeps[id]) {
+    this.newDeps[id] = dep
+    if (!this.deps[id]) {
+      this.deps[id] = dep
       dep.addSub(this)
-    } else {
-      old[i] = null
     }
   }
 }
@@ -11066,7 +11285,7 @@ p.addDep = function (dep) {
  * Evaluate the getter, and re-collect dependencies.
  */
 
-p.get = function () {
+Watcher.prototype.get = function () {
   this.beforeGet()
   var vm = this.vm
   var value
@@ -11081,8 +11300,8 @@ p.get = function () {
         'Error when evaluating expression "' +
         this.expression + '". ' +
         (config.debug
-          ? '' :
-          'Turn on debug mode to see stack trace.'
+          ? ''
+          : 'Turn on debug mode to see stack trace.'
         ), e
       )
     }
@@ -11108,7 +11327,7 @@ p.get = function () {
  * @param {*} value
  */
 
-p.set = function (value) {
+Watcher.prototype.set = function (value) {
   var vm = this.vm
   if (this.filters) {
     value = vm._applyFilters(
@@ -11133,26 +11352,26 @@ p.set = function (value) {
  * Prepare for dependency collection.
  */
 
-p.beforeGet = function () {
+Watcher.prototype.beforeGet = function () {
   Dep.target = this
-  this.newDeps = []
+  this.newDeps = Object.create(null)
 }
 
 /**
  * Clean up for dependency collection.
  */
 
-p.afterGet = function () {
+Watcher.prototype.afterGet = function () {
   Dep.target = null
-  var i = this.deps.length
+  var ids = Object.keys(this.deps)
+  var i = ids.length
   while (i--) {
-    var dep = this.deps[i]
-    if (dep) {
-      dep.removeSub(this)
+    var id = ids[i]
+    if (!this.newDeps[id]) {
+      this.deps[id].removeSub(this)
     }
   }
   this.deps = this.newDeps
-  this.newDeps = null
 }
 
 /**
@@ -11162,10 +11381,10 @@ p.afterGet = function () {
  * @param {Boolean} shallow
  */
 
-p.update = function (shallow) {
+Watcher.prototype.update = function (shallow) {
   if (this.lazy) {
     this.dirty = true
-  } else if (!config.async) {
+  } else if (this.sync || !config.async) {
     this.run()
   } else {
     // if queued, only overwrite shallow with non-shallow,
@@ -11176,6 +11395,11 @@ p.update = function (shallow) {
         : false
       : !!shallow
     this.queued = true
+    // record before-push error stack in debug mode
+    /* istanbul ignore if */
+    if (process.env.NODE_ENV !== 'production' && config.debug) {
+      this.prevError = new Error('[vue] async stack trace')
+    }
     batcher.push(this)
   }
 }
@@ -11185,7 +11409,7 @@ p.update = function (shallow) {
  * Will be called by the batcher.
  */
 
-p.run = function () {
+Watcher.prototype.run = function () {
   if (this.active) {
     var value = this.get()
     if (
@@ -11196,9 +11420,28 @@ p.run = function () {
       // non-shallow update (caused by a vm digest).
       ((_.isArray(value) || this.deep) && !this.shallow)
     ) {
+      // set new value
       var oldValue = this.value
       this.value = value
-      this.cb(value, oldValue)
+      // in debug + async mode, when a watcher callbacks
+      // throws, we also throw the saved before-push error
+      // so the full cross-tick stack trace is available.
+      var prevError = this.prevError
+      /* istanbul ignore if */
+      if (process.env.NODE_ENV !== 'production' &&
+          config.debug && prevError) {
+        this.prevError = null
+        try {
+          this.cb.call(this.vm, value, oldValue)
+        } catch (e) {
+          _.nextTick(function () {
+            throw prevError
+          }, 0)
+          throw e
+        }
+      } else {
+        this.cb.call(this.vm, value, oldValue)
+      }
     }
     this.queued = this.shallow = false
   }
@@ -11209,7 +11452,7 @@ p.run = function () {
  * This only gets called for lazy watchers.
  */
 
-p.evaluate = function () {
+Watcher.prototype.evaluate = function () {
   // avoid overwriting another watcher that is being
   // collected.
   var current = Dep.target
@@ -11222,10 +11465,11 @@ p.evaluate = function () {
  * Depend on all deps collected by this watcher.
  */
 
-p.depend = function () {
-  var i = this.deps.length
+Watcher.prototype.depend = function () {
+  var depIds = Object.keys(this.deps)
+  var i = depIds.length
   while (i--) {
-    this.deps[i].depend()
+    this.deps[depIds[i]].depend()
   }
 }
 
@@ -11233,7 +11477,7 @@ p.depend = function () {
  * Remove self from all dependencies' subcriber list.
  */
 
-p.teardown = function () {
+Watcher.prototype.teardown = function () {
   if (this.active) {
     // remove self from vm's watcher list
     // we can skip this if the vm if being destroyed
@@ -11241,9 +11485,10 @@ p.teardown = function () {
     if (!this.vm._isBeingDestroyed) {
       this.vm._watchers.$remove(this)
     }
-    var i = this.deps.length
+    var depIds = Object.keys(this.deps)
+    var i = depIds.length
     while (i--) {
-      this.deps[i].removeSub(this)
+      this.deps[depIds[i]].removeSub(this)
     }
     this.active = false
     this.vm = this.cb = this.value = null
@@ -11274,7 +11519,7 @@ function traverse (obj) {
 module.exports = Watcher
 
 }).call(this,require('_process'))
-},{"./batcher":16,"./config":22,"./observer/dep":56,"./parsers/expression":60,"./util":71,"_process":80}],76:[function(require,module,exports){
+},{"./batcher":16,"./config":22,"./observer/dep":56,"./parsers/expression":60,"./util":71,"_process":79}],76:[function(require,module,exports){
 /**
  * Boot up the Vue instance and wire up the router.
  */
@@ -11287,13 +11532,9 @@ var router = new Router()
 /**
  * Router.
  */
-router.on('/', function () {
-	app.view = 'home-view'
-})
-
-router.on('/:page', function (url) {
-	app.view = 'page-view'
-	app.params.url = url
+router.on('/articles/:uuid', function (uuid) {
+	app.view = 'article-view'
+	app.params.uuid = uuid
 })
 
 router.init('/')
@@ -11305,31 +11546,35 @@ module.exports = {
     data: {
       view: '',
       params: {
-        url: ''
+        uuid: ''
       }
     },
     components: {
-      'home-view': require('./views/home-view.vue'),
-      'page-view': require('./views/page-view.vue')
+      'article-view': require('./views/article-view.vue')
     }
   }
 ;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
 
-},{"./views/home-view.vue":78,"./views/page-view.vue":79}],78:[function(require,module,exports){
-var __vue_template__ = "<div id=\"latest\">\n    <div class=\"wrap\">\n      <ul class=\"pure-g\">\n        <li class=\"pure-u-1\">\n          <div class=\"post teaser\" v-repeat=\"articles\">\n            <h2><a class=\"post-link\" href=\"#{{ path }}\" v-html=\"title\"></a></h2>\n          </div>\n        </li>\n      </ul>\n    </div>\n  </div>";
+},{"./views/article-view.vue":78}],78:[function(require,module,exports){
+var __vue_template__ = "<div class=\"post full\">\n      <article class=\"post-content\">\n        <div class=\"wrap\">\n          <h1 v-text=\"article.title\"></h1>\n        </div>\n        <span v-html=\"article.body\"></span>\n      </article>\n    </div>";
 module.exports = {
+    props: ['params'],
     data: function () {
       return {
-        articles: {}
+        article: {
+          title: '',
+          body: ''
+        }
       }
     },
     ready: function() {
-      this.fetchArticles()
+      this.fetchPage(this.params.uuid)
     },
     methods: {
-      fetchArticles: function() {
-        this.$http.get('http://api.briward.site/articles', function (articles) {
-          this.$set('articles', articles)
+      fetchPage: function(uuid) {
+        console.log('fetching')
+        this.$http.get('/api/v1.0/articles/' + uuid + '?_format=json', function (article) {
+          this.$set('article', article)
         })
       }
     }
@@ -11337,42 +11582,6 @@ module.exports = {
 ;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
 
 },{}],79:[function(require,module,exports){
-var __vue_template__ = "<div class=\"post full\">\n      <article class=\"post-content\">\n        <div class=\"wrap\">\n          <h1 v-text=\"page.title\"></h1>\n          <div class=\"date\" v-text=\"page.created\"></div>\n        </div>\n        <span v-html=\"page.body\"></span>\n      </article>\n    </div>";
-module.exports = {
-    props: ['params'],
-    data: function () {
-      return {
-        page: {
-          title: '',
-          body: '',
-          created: ''
-        }
-      }
-    },
-    ready: function() {
-      this.fetchPage(this.params.url)
-    },
-    methods: {
-      fetchPage: function(url) {
-        this.$http.get('http://api.briward.site/' + url + '?_format=hal_json', function (page) {
-
-          // Let's convert that ugly timestamp.
-          var date = new Date(page.created[0].value * 1000)
-
-          // Set the page object.
-          this.$set('page', {
-            title: page.title[0].value,
-            body: page.body[0].value,
-            created: date.toDateString()
-          })
-
-        })
-      }
-    }
-  }
-;(typeof module.exports === "function"? module.exports.options: module.exports).template = __vue_template__;
-
-},{}],80:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};

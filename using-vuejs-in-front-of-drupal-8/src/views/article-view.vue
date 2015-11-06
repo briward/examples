@@ -2,9 +2,9 @@
     <div class="post full">
       <article class="post-content">
         <div class="wrap">
-          <h1 v-text="page.title"></h1>
+          <h1 v-text="article.title"></h1>
         </div>
-        <span v-html="page.body"></span>
+        <span v-html="article.body"></span>
       </article>
     </div>
 </template>
@@ -14,7 +14,7 @@
     props: ['params'],
     data: function () {
       return {
-        page: {
+        article: {
           title: '',
           body: ''
         }
@@ -25,7 +25,8 @@
     },
     methods: {
       fetchPage: function(uuid) {
-        this.$http.get('/api/v1.0/articles/' + uuid + '?_format=hal_json', function (article) {
+        console.log('fetching')
+        this.$http.get('/api/v1.0/articles/' + uuid + '?_format=json', function (article) {
           this.$set('article', article)
         })
       }
