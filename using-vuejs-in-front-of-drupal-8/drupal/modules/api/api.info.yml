@@ -1,0 +1,6 @@
+name: API
+type: module
+description: 'Exposes custom REST api.'
+package: Web services
+version: 1.0
+core: 8.x

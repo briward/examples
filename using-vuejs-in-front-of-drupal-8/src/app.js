@@ -10,13 +10,9 @@ var router = new Router()
 /**
  * Router.
  */
-router.on('/', function () {
-	app.view = 'home-view'
-})
-
-router.on('/:page', function (url) {
-	app.view = 'page-view'
-	app.params.url = url
+router.on('/articles/:uuid', function (uuid) {
+	app.view = 'article-view'
+	app.params.uuid = uuid
 })
 
 router.init('/')

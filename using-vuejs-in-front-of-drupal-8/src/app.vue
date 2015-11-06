@@ -13,12 +13,11 @@
     data: {
       view: '',
       params: {
-        url: ''
+        uuid: ''
       }
     },
     components: {
-      'home-view': require('./views/home-view.vue'),
-      'page-view': require('./views/page-view.vue')
+      'article-view': require('./views/article-view.vue')
     }
   }
 </script>
